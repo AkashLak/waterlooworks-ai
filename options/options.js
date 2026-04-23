@@ -145,10 +145,19 @@ async function _handleSave() {
             _showStatus('✓ Resume saved! Gemini connection confirmed.', 'success');
             WWStorage.setOnboardingComplete();
         } else {
-            _showStatus(
-                `Resume saved, but Gemini connection failed: ${response?.error ?? 'unknown error'}. Check your API key in config.js.`,
-                'error',
-            );
+            const isRateLimit = response?.error?.toLowerCase().includes('rate limit');
+            if (isRateLimit) {
+                _showStatus(
+                    '✓ Resume saved! (Connection test hit the rate limit — your API key is valid. Wait a moment and try analyzing a job.)',
+                    'success',
+                );
+                WWStorage.setOnboardingComplete();
+            } else {
+                _showStatus(
+                    `Resume saved, but Gemini connection failed: ${response?.error ?? 'unknown error'}. Check your API key in config.js.`,
+                    'error',
+                );
+            }
         }
     });
 }
