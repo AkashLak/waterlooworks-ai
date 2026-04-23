@@ -22,7 +22,13 @@
   "content_scripts": [
     {
       "matches": ["*://waterlooworks.uwaterloo.ca/*"],
-      "js": ["content/content.js"],
+      "js": [
+        "lib/storage.js",
+        "lib/scraper.js",
+        "lib/analyzer.js",
+        "content/content.js"
+      ],
+      "css": ["content/panel.css"],
       "run_at": "document_idle"
     }
   ],
