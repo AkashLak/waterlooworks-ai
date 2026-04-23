@@ -15,7 +15,8 @@
     width: 28px;
     padding: 14px 5px;
     cursor: pointer;
-    z-index: 99999;
+    /* WaterlooWorks job modal uses z-index: 100000102 — must stay above it */
+    z-index: 100000201;
     writing-mode: vertical-lr;
     font-weight: 700;
     font-size: 11px;
@@ -38,7 +39,8 @@
     height: 100vh;
     background: #fff;
     box-shadow: -2px 0 16px rgba(0,0,0,0.14);
-    z-index: 99998;
+    /* WaterlooWorks job modal uses z-index: 100000102 — must stay above it */
+    z-index: 100000200;
     transition: right 0.2s ease;
     display: flex;
     flex-direction: column;
