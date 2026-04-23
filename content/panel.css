@@ -1,0 +1,190 @@
+/* WaterlooWorks AI Assistant — injected panel styles.
+   All classes use the wwai- prefix to avoid collisions with WaterlooWorks styles. */
+
+/* ── Toggle button ─────────────────────────────────────────────────────────── */
+
+#wwai-toggle {
+    position: fixed;
+    right: 0;
+    top: 40%;
+    transform: translateY(-50%);
+    background: #FFC72C;
+    color: #1a1a1a;
+    border: none;
+    border-radius: 8px 0 0 8px;
+    width: 28px;
+    padding: 14px 5px;
+    cursor: pointer;
+    z-index: 99999;
+    writing-mode: vertical-lr;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 1px;
+    box-shadow: -2px 0 8px rgba(0,0,0,0.12);
+    transition: right 0.2s ease, background 0.15s;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+#wwai-toggle:hover { background: #e6b020; }
+/* Slide toggle outward when panel is open */
+#wwai-panel.wwai-open ~ #wwai-toggle { right: 320px; }
+
+/* ── Panel container ───────────────────────────────────────────────────────── */
+
+#wwai-panel {
+    position: fixed;
+    top: 0;
+    right: -340px;
+    width: 320px;
+    height: 100vh;
+    background: #fff;
+    box-shadow: -2px 0 16px rgba(0,0,0,0.14);
+    z-index: 99998;
+    transition: right 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    color: #1a1a1a;
+    box-sizing: border-box;
+    /* Clear WaterlooWorks's floating bottom action bar (~60px) */
+    padding-bottom: 60px;
+}
+#wwai-panel.wwai-open { right: 0; }
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+
+.wwai-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 14px;
+    background: #1a1a1a;
+    color: #FFC72C;
+    flex-shrink: 0;
+}
+.wwai-header__title { font-weight: 700; font-size: 13px; letter-spacing: 0.4px; }
+.wwai-header__close {
+    background: none; border: none; color: #FFC72C;
+    font-size: 18px; cursor: pointer; padding: 0 2px; line-height: 1;
+}
+.wwai-header__close:hover { opacity: 0.7; }
+
+/* ── Scrollable body ───────────────────────────────────────────────────────── */
+
+.wwai-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* ── Job info ──────────────────────────────────────────────────────────────── */
+
+.wwai-job-info {
+    background: #f5f5f5;
+    border-left: 3px solid #FFC72C;
+    padding: 8px 10px;
+    border-radius: 0 4px 4px 0;
+}
+.wwai-job-info__title  { font-weight: 600; font-size: 13px; line-height: 1.3; }
+.wwai-job-info__employer { font-size: 12px; color: #555; margin-top: 2px; }
+
+/* ── Action buttons grid ───────────────────────────────────────────────────── */
+
+.wwai-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+.wwai-btn {
+    padding: 8px 6px;
+    border: 1.5px solid #1a1a1a;
+    border-radius: 6px;
+    background: #fff;
+    color: #1a1a1a;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    text-align: center;
+    font-family: inherit;
+}
+.wwai-btn:hover   { background: #FFC72C; border-color: #FFC72C; }
+.wwai-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.wwai-btn--active  { background: #1a1a1a; color: #FFC72C; }
+.wwai-btn--full    { grid-column: 1 / -1; }
+.wwai-btn--gold    { background: #FFC72C; border-color: #FFC72C; font-weight: 700; }
+.wwai-btn--gold:hover { background: #e6b020; border-color: #e6b020; }
+
+/* ── Result card ───────────────────────────────────────────────────────────── */
+
+.wwai-result {
+    background: #f9f9f9;
+    border: 1px solid #e4e4e4;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+.wwai-result__label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.6px; color: #888; margin-bottom: 5px;
+}
+
+/* Fit score */
+.wwai-score { font-size: 26px; font-weight: 800; margin-bottom: 4px; }
+.wwai-score__bar {
+    height: 5px; border-radius: 3px; background: #e4e4e4; margin-bottom: 8px; overflow: hidden;
+}
+.wwai-score__fill         { height: 100%; border-radius: 3px; background: #FFC72C; }
+.wwai-score__fill--great  { background: #22c55e; }
+.wwai-score__fill--decent { background: #FFC72C; }
+.wwai-score__fill--poor   { background: #ef4444; }
+
+/* Tag lists */
+.wwai-tag-list { display: flex; flex-direction: column; gap: 3px; margin: 3px 0; }
+.wwai-tag      { font-size: 12px; padding: 2px 7px; border-radius: 4px; background: #f0f0f0; }
+.wwai-tag--green { background: #dcfce7; color: #166534; }
+.wwai-tag--red   { background: #fee2e2; color: #991b1b; }
+.wwai-tag--warn  { background: #fff7ed; color: #9a3412; }
+
+/* ── Loading ───────────────────────────────────────────────────────────────── */
+
+.wwai-loading { display: flex; align-items: center; gap: 8px; color: #888; font-size: 13px; }
+.wwai-spinner {
+    width: 14px; height: 14px; flex-shrink: 0;
+    border: 2px solid #e4e4e4; border-top-color: #FFC72C;
+    border-radius: 50%; animation: wwai-spin 0.7s linear infinite;
+}
+@keyframes wwai-spin { to { transform: rotate(360deg); } }
+
+/* ── Empty / error states ──────────────────────────────────────────────────── */
+
+.wwai-empty { text-align: center; color: #888; font-size: 13px; padding: 16px 0; line-height: 1.6; }
+
+/* ── Ask input ─────────────────────────────────────────────────────────────── */
+
+.wwai-ask { display: flex; gap: 6px; }
+.wwai-ask__input {
+    flex: 1; padding: 7px 10px; border: 1.5px solid #e0e0e0; border-radius: 6px;
+    font-size: 12px; outline: none; font-family: inherit; transition: border-color 0.12s;
+}
+.wwai-ask__input:focus { border-color: #FFC72C; }
+.wwai-ask__btn {
+    padding: 7px 12px; background: #1a1a1a; color: #FFC72C; border: none;
+    border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.wwai-ask__btn:hover { background: #333; }
+
+/* ── Batch progress ────────────────────────────────────────────────────────── */
+
+.wwai-progress        { font-size: 12px; color: #555; }
+.wwai-progress__bar   { height: 4px; background: #e4e4e4; border-radius: 2px; margin-top: 5px; overflow: hidden; }
+.wwai-progress__fill  { height: 100%; background: #FFC72C; border-radius: 2px; transition: width 0.3s ease; }
+.wwai-summary         { font-size: 12px; background: #f9f9f9; border: 1px solid #e4e4e4; border-radius: 6px; padding: 8px 12px; line-height: 1.8; }
+
+/* ── Misc ──────────────────────────────────────────────────────────────────── */
+
+.wwai-divider { border: none; border-top: 1px solid #ebebeb; margin: 2px 0; }
+.wwai-footer  { padding: 7px 14px; text-align: center; font-size: 11px; color: #bbb; border-top: 1px solid #ebebeb; flex-shrink: 0; }
+.wwai-hidden  { display: none !important; }
+.wwai-verdict { font-weight: 600; margin: 4px 0 8px; }
