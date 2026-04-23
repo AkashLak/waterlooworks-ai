@@ -102,8 +102,12 @@ async function handleAnalyze(message, sender) {
         // "Rate limit hit, retrying in Xs..." without blocking sendResponse.
         onProgress: tabId != null
             ? (update) => {
-                chrome.tabs.sendMessage(tabId, { type: 'wwai_progress', ...update })
-                    .catch(() => {}); // tab may have closed between retries
+                // Spread would overwrite 'type', so pass fields explicitly
+                chrome.tabs.sendMessage(tabId, {
+                    type:         'wwai_progress',
+                    progressType: update.type,
+                    delaySeconds: update.delaySeconds,
+                }).catch(() => {}); // tab may have closed between retries
               }
             : undefined,
     });
