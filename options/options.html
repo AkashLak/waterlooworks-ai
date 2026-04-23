@@ -1,1 +1,80 @@
-<!-- placeholder — implemented in step 6 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>WaterlooWorks AI — Settings</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+    <div class="page">
+
+        <header class="header">
+            <div class="header__title">WaterlooWorks AI</div>
+            <div class="header__sub">Powered by Google Gemini — free to use</div>
+        </header>
+
+        <main class="container">
+
+            <!-- Onboarding checklist -->
+            <section class="card">
+                <h2 class="card__title">Getting Started</h2>
+                <ol class="checklist">
+                    <li class="checklist__item" id="step-resume">
+                        <span class="checklist__icon" id="icon-resume">○</span>
+                        Add your resume
+                    </li>
+                    <li class="checklist__item">
+                        <span class="checklist__icon checklist__icon--done">✓</span>
+                        <a href="https://waterlooworks.uwaterloo.ca" target="_blank" rel="noopener">
+                            Go to WaterlooWorks →
+                        </a>
+                    </li>
+                    <li class="checklist__item">
+                        <span class="checklist__icon checklist__icon--done">✓</span>
+                        Click the <strong>AI</strong> tab on any job page
+                    </li>
+                </ol>
+            </section>
+
+            <!-- Resume input -->
+            <section class="card">
+                <h2 class="card__title">Your Resume</h2>
+                <p class="hint">
+                    Paste your resume as plain text, or upload a PDF.<br>
+                    Your resume stays on your device — it's only sent to Gemini when you analyze a job.
+                </p>
+
+                <textarea
+                    id="resume-text"
+                    class="textarea"
+                    placeholder="Paste your resume here…"
+                    spellcheck="false"
+                ></textarea>
+
+                <div class="upload-row">
+                    <label class="btn btn--secondary" for="pdf-upload">
+                        📄 Upload PDF
+                    </label>
+                    <input type="file" id="pdf-upload" accept=".pdf" hidden>
+                    <span class="upload-status" id="pdf-status"></span>
+                </div>
+
+                <div class="char-count" id="char-count">0 characters</div>
+
+                <div class="actions">
+                    <button class="btn btn--primary" id="save-btn">Save &amp; Test Connection</button>
+                    <button class="btn btn--ghost"   id="clear-btn">Clear</button>
+                </div>
+
+                <div class="status-msg hidden" id="status-msg" role="alert"></div>
+            </section>
+
+        </main>
+
+    </div>
+
+    <!-- lib/storage.js must load before options.js so WWStorage is available -->
+    <script src="../lib/storage.js"></script>
+    <script src="options.js"></script>
+</body>
+</html>
