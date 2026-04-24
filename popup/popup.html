@@ -1,1 +1,54 @@
-<!-- placeholder — implemented in step 7 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>WaterlooWorks AI</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="popup">
+
+        <header class="header">
+            <span class="header__title">WaterlooWorks AI</span>
+        </header>
+
+        <main class="body">
+
+            <!-- Status rows -->
+            <div class="status-list">
+                <div class="status-row" id="row-resume">
+                    <span class="status-icon" id="icon-resume">○</span>
+                    <span class="status-label">Resume loaded</span>
+                </div>
+                <div class="status-row" id="row-ww">
+                    <span class="status-icon" id="icon-ww">○</span>
+                    <span class="status-label">On WaterlooWorks</span>
+                </div>
+            </div>
+
+            <!-- Session stats -->
+            <div class="stat-row">
+                <span class="stat-num" id="jobs-count">—</span>
+                <span class="stat-label">jobs analyzed this session</span>
+            </div>
+
+            <!-- Nudge shown when not on WaterlooWorks -->
+            <a class="nudge hidden" id="nudge"
+               href="https://waterlooworks.uwaterloo.ca"
+               target="_blank" rel="noopener">
+                Head to WaterlooWorks to start analyzing jobs →
+            </a>
+
+        </main>
+
+        <footer class="footer">
+            <button class="btn-settings" id="btn-settings">⚙ Settings</button>
+            <span class="powered">Powered by Gemini — free to use</span>
+        </footer>
+
+    </div>
+
+    <script src="../lib/storage.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>
