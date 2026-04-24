@@ -126,15 +126,40 @@ async function handleTestConnection() {
         throw new Error('Gemini API key is not configured in config.js.');
     }
 
-    // Minimal round-trip to confirm the API key is valid and the endpoint is reachable.
-    // Uses ASK mode so it goes through the same code path as real analysis calls.
-    await WWAi.analyze({
-        mode:           WWAi.MODES.ASK,
-        resume:         '(connection test)',
-        jobDescription: '(connection test)',
-        question:       'Respond with only the word "ok".',
-        apiKey:         GEMINI_API_KEY,
-    });
+    // Single-attempt fetch — no retry loop. A 429 here means the key is valid
+    // but temporarily rate-limited, which the options page treats as success.
+    // A 401/403 means the key is genuinely wrong.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+
+    let response;
+    try {
+        response = await fetch(url, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+                contents: [{ parts: [{ text: 'Respond with only the word "ok".' }] }],
+                generationConfig: { maxOutputTokens: 10 },
+            }),
+            signal: controller.signal,
+        });
+    } catch (err) {
+        throw new Error(err.name === 'AbortError' ? 'Connection timed out.' : 'Network error.');
+    } finally {
+        clearTimeout(timer);
+    }
+
+    // 429 = valid key, just rate limited — treat as pass
+    if (response.status === 429) return;
+
+    if (response.status === 401 || response.status === 403) {
+        throw new Error('API key is invalid or unauthorized. Check your key in config.js.');
+    }
+
+    if (!response.ok) {
+        throw new Error(`Gemini API returned status ${response.status}.`);
+    }
 
     _log('Connection test passed');
 }

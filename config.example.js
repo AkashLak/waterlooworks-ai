@@ -5,6 +5,9 @@
 /** @type {string} Your Google Gemini API key (free tier, from https://aistudio.google.com) */
 const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE";
 
+/** @type {string} Gemini model to use — change here to switch models globally */
+const GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
+
 /**
  * When true, enables verbose console logging in background.js only.
  * Must be false before distributing to users.
