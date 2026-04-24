@@ -261,11 +261,16 @@ function _fillDreamJob(card, d) {
 }
 
 function _fillQaSniff(card, d) {
-    _label(card, 'Sniff Test');
-    const v = _el(card, 'div', 'wwai-score', d.isDisguised ? `⚠️ ${d.actualRole ?? 'Disguised role'}` : '✓ Looks like real dev work');
+    _label(card, 'Role Check');
+    const matches = d.titleMatchesRole ?? !d.isDisguised; // backwards-compat
+    const v = _el(card, 'div', 'wwai-score',
+        matches ? '✓ Title matches the role' : `⚠️ ${d.actualRole ?? 'Title is misleading'}`
+    );
     v.style.fontSize = '15px';
-    v.style.color = d.isDisguised ? '#ef4444' : '#22c55e';
-    if (d.redFlags?.length) { _label(card, 'Red Flags'); _tagList(card, d.redFlags, 'red'); }
+    v.style.color = matches ? '#22c55e' : '#ef4444';
+    if (d.summary) _el(card, 'p', 'wwai-verdict', d.summary);
+    if (d.redFlags?.length)        { _label(card, 'Red Flags');         _tagList(card, d.redFlags, 'red'); }
+    if (d.alsoGoodFitFor?.length)  { _label(card, 'Also a good fit for'); _tagList(card, d.alsoGoodFitFor, 'warn'); }
 }
 
 function _fillText(card, data, labelText) {

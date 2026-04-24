@@ -39,17 +39,21 @@ pdfUploadEl.addEventListener('change', (e) => {
     pdfStatusEl.textContent = 'Reading…';
     const reader = new FileReader();
 
-    reader.onload = (event) => {
-        const text = _extractPdfText(event.target.result);
-        if (text.length > 80) {
-            resumeTextEl.value = text;
-            _updateCharCount();
-            pdfStatusEl.textContent = '✓ Text extracted from PDF';
-        } else {
+    reader.onload = async (event) => {
+        try {
+            const text = await _extractPdfText(event.target.result);
+            if (text.length > 80) {
+                resumeTextEl.value = text;
+                _updateCharCount();
+                pdfStatusEl.textContent = '✓ Text extracted from PDF';
+            } else {
+                pdfStatusEl.textContent =
+                    'Could not extract text. Open the PDF, press Cmd+A then Cmd+C, and paste directly.';
+            }
+        } catch (_) {
             pdfStatusEl.textContent =
-                'Could not extract text — this PDF may use compressed streams. Please paste your resume text directly.';
+                'Could not read this PDF. Open it, press Cmd+A then Cmd+C, and paste directly.';
         }
-        // Reset so the same file can be re-selected if needed
         pdfUploadEl.value = '';
     };
 
@@ -61,16 +65,16 @@ pdfUploadEl.addEventListener('change', (e) => {
 });
 
 /**
- * Basic PDF text extraction without external libraries.
- * Works for PDFs with uncompressed text streams (most Word/Google Docs exports).
- * Falls back gracefully for compressed-stream PDFs.
+ * Extracts plain text from a PDF ArrayBuffer.
+ * Handles both uncompressed and FlateDecode (zlib) compressed content streams
+ * using the browser's native DecompressionStream API — no external libraries needed.
  * @param {ArrayBuffer} buffer
- * @returns {string}
+ * @returns {Promise<string>}
  */
-function _extractPdfText(buffer) {
+async function _extractPdfText(buffer) {
     const bytes = new Uint8Array(buffer);
 
-    // Build a latin-1 string in chunks to avoid stack overflow on large files
+    // Build a latin-1 string — each character maps 1:1 to a byte so positions match
     const CHUNK = 32768;
     let raw = '';
     for (let i = 0; i < bytes.length; i += CHUNK) {
@@ -79,17 +83,86 @@ function _extractPdfText(buffer) {
 
     const parts = [];
 
-    // Pattern 1: (text) Tj  — single string text show
-    const tjRe = /\(([^)\\]|\\.)*\)\s*Tj/g;
+    // Find every stream...endstream block in the file
+    const streamRe = /stream\r?\n/g;
     let m;
-    while ((m = tjRe.exec(raw)) !== null) {
-        const inner = m[0].slice(1, m[0].lastIndexOf(')'));
-        parts.push(_decodePdfString(inner));
+    while ((m = streamRe.exec(raw)) !== null) {
+        const contentStart = m.index + m[0].length;
+        const endIdx = raw.indexOf('endstream', contentStart);
+        if (endIdx === -1) continue;
+
+        // Look back for the object dictionary to check for FlateDecode
+        const dictStart = raw.lastIndexOf('<<', m.index);
+        const dict = dictStart !== -1 ? raw.slice(dictStart, m.index) : '';
+        const isFlate = /FlateDecode|\/Fl[\s/]/.test(dict);
+
+        let content = '';
+        if (isFlate) {
+            try {
+                const compressed = bytes.subarray(contentStart, endIdx);
+                const decompressed = await _zlibDecompress(compressed);
+                content = new TextDecoder('latin1').decode(decompressed);
+            } catch (_) {
+                continue; // stream is not valid zlib, skip it
+            }
+        } else {
+            content = raw.slice(contentStart, endIdx);
+        }
+
+        const text = _extractTextOps(content);
+        if (text.length > 10) parts.push(text);
     }
 
-    // Pattern 2: [(text) spacing ...] TJ  — array text show
+    return parts.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Decompress a zlib (FlateDecode) buffer using the browser's DecompressionStream.
+ * Tries the zlib wrapper format first, then falls back to raw deflate.
+ * @param {Uint8Array} data
+ * @returns {Promise<Uint8Array>}
+ */
+async function _zlibDecompress(data) {
+    // PDF FlateDecode uses zlib format (deflate + 2-byte header + adler32 checksum)
+    for (const format of ['deflate', 'deflate-raw']) {
+        try {
+            const ds = new DecompressionStream(format);
+            const writer = ds.writable.getWriter();
+            const reader = ds.readable.getReader();
+            writer.write(data);
+            writer.close();
+
+            const chunks = [];
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+            }
+
+            const total = chunks.reduce((s, c) => s + c.length, 0);
+            const out = new Uint8Array(total);
+            let off = 0;
+            for (const c of chunks) { out.set(c, off); off += c.length; }
+            return out;
+        } catch (_) {
+            // try next format
+        }
+    }
+    throw new Error('Decompression failed');
+}
+
+/** Extracts text from PDF content stream operators (Tj and TJ). */
+function _extractTextOps(content) {
+    const parts = [];
+    let m;
+
+    const tjRe = /\(([^)\\]|\\.)*\)\s*Tj/g;
+    while ((m = tjRe.exec(content)) !== null) {
+        parts.push(_decodePdfString(m[0].slice(1, m[0].lastIndexOf(')'))));
+    }
+
     const tjArrRe = /\[([^\]]*)\]\s*TJ/g;
-    while ((m = tjArrRe.exec(raw)) !== null) {
+    while ((m = tjArrRe.exec(content)) !== null) {
         const strRe = /\(([^)\\]|\\.)*\)/g;
         let sm;
         while ((sm = strRe.exec(m[1])) !== null) {
@@ -97,18 +170,13 @@ function _extractPdfText(buffer) {
         }
     }
 
-    return parts
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+    return parts.join(' ').trim();
 }
 
 function _decodePdfString(s) {
     return s
-        .replace(/\\n/g, '\n')
-        .replace(/\\r/g, '\n')
-        .replace(/\\t/g, ' ')
-        .replace(/\\(.)/g, '$1');
+        .replace(/\\n/g, '\n').replace(/\\r/g, '\n')
+        .replace(/\\t/g, ' ').replace(/\\(.)/g, '$1');
 }
 
 // ── Save ───────────────────────────────────────────────────────────────────────
