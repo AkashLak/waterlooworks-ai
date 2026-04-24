@@ -4,6 +4,11 @@
 
 importScripts('../config.js', '../lib/storage.js', '../lib/ai.js');
 
+// Tracks job IDs analyzed this service worker session.
+// Using a Set means clicking multiple analysis buttons on the same job
+// only increments the counter once — when that job is first analyzed.
+const _analyzedJobIds = new Set();
+
 // ── Dev-mode logger ────────────────────────────────────────────────────────────
 // SECURITY: Never log GEMINI_API_KEY, resume text, or raw API responses.
 
@@ -117,9 +122,12 @@ async function handleAnalyze(message, sender) {
             : undefined,
     });
 
-    // Increment session counter — fire-and-forget; storage errors must not
-    // propagate back and fail the analysis response.
-    WWStorage.incrementJobsAnalyzed().catch(() => {});
+    // Increment only the first time a specific job is analyzed this session.
+    // All 4 buttons on the same job count as 1, not 4.
+    if (jobId && !_analyzedJobIds.has(jobId)) {
+        _analyzedJobIds.add(jobId);
+        WWStorage.incrementJobsAnalyzed().catch(() => {});
+    }
 
     _log('Analysis complete | mode:', mode, '| job:', jobId);
 
