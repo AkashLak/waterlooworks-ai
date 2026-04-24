@@ -4,10 +4,16 @@
 
 importScripts('../config.js', '../lib/storage.js', '../lib/ai.js');
 
-// Tracks job IDs analyzed this service worker session.
-// Using a Set means clicking multiple analysis buttons on the same job
-// only increments the counter once — when that job is first analyzed.
-const _analyzedJobIds = new Set();
+// _analyzedJobIds is backed by chrome.storage.session so it survives service
+// worker restarts within the same browser session. An in-memory Set alone would
+// reset every ~30s when Chrome terminates the idle service worker.
+async function _isNewJob(jobId) {
+    if (!jobId) return false;
+    const { ww_analyzed_ids: ids = [] } = await chrome.storage.session.get('ww_analyzed_ids');
+    if (ids.includes(jobId)) return false;
+    await chrome.storage.session.set({ ww_analyzed_ids: [...ids, jobId] });
+    return true;
+}
 
 // ── Dev-mode logger ────────────────────────────────────────────────────────────
 // SECURITY: Never log GEMINI_API_KEY, resume text, or raw API responses.
@@ -123,9 +129,7 @@ async function handleAnalyze(message, sender) {
     });
 
     // Increment only the first time a specific job is analyzed this session.
-    // All 4 buttons on the same job count as 1, not 4.
-    if (jobId && !_analyzedJobIds.has(jobId)) {
-        _analyzedJobIds.add(jobId);
+    if (await _isNewJob(jobId)) {
         WWStorage.incrementJobsAnalyzed().catch(() => {});
     }
 

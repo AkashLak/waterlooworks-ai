@@ -27,15 +27,21 @@ const badgeJobs   = document.getElementById('badge-jobs');
 
     badgeJobs.textContent = `Jobs analyzed: ${jobsAnalyzed ?? 0}`;
 
-    // Model name is written to storage by background.js on startup
+    // Model name is written to storage by background.js on startup.
+    // If the service worker hasn't run yet, the onChanged listener below catches it.
     chrome.storage.local.get('ww_dev_model', (result) => {
-        badgeModel.textContent = `Model: ${result.ww_dev_model ?? 'see config.js'}`;
+        if (result.ww_dev_model) {
+            badgeModel.textContent = `Model: ${result.ww_dev_model}`;
+        }
     });
 })();
 
-// Keep badges in sync if storage changes in another page (e.g. Options saves a resume)
+// Keep badges in sync whenever storage changes (service worker startup, Options page, etc.)
 chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
+    if (changes.ww_dev_model?.newValue) {
+        badgeModel.textContent = `Model: ${changes.ww_dev_model.newValue}`;
+    }
     if (changes.ww_resume) {
         const resume = changes.ww_resume.newValue;
         if (resume) {
