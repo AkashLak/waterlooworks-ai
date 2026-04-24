@@ -27,12 +27,12 @@ const badgeJobs   = document.getElementById('badge-jobs');
 
     badgeJobs.textContent = `Jobs analyzed: ${jobsAnalyzed ?? 0}`;
 
-    // Model name is written to storage by background.js on startup.
-    // If the service worker hasn't run yet, the onChanged listener below catches it.
-    chrome.storage.local.get('ww_dev_model', (result) => {
-        if (result.ww_dev_model) {
-            badgeModel.textContent = `Model: ${result.ww_dev_model}`;
-        }
+    // Send a message to wake the service worker (which writes ww_dev_model to storage),
+    // then read it in the callback — guarantees the value exists before we read it.
+    chrome.runtime.sendMessage({ action: 'getStats' }, () => {
+        chrome.storage.local.get('ww_dev_model', (result) => {
+            badgeModel.textContent = `Model: ${result.ww_dev_model ?? 'see config.js'}`;
+        });
     });
 })();
 

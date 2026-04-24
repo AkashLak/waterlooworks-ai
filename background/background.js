@@ -4,14 +4,17 @@
 
 importScripts('../config.js', '../lib/storage.js', '../lib/ai.js');
 
-// _analyzedJobIds is backed by chrome.storage.session so it survives service
-// worker restarts within the same browser session. An in-memory Set alone would
-// reset every ~30s when Chrome terminates the idle service worker.
+/**
+ * Returns true the first time a jobId is analyzed, false on repeat clicks.
+ * Persisted in chrome.storage.local so it survives service worker restarts.
+ * Cleared by WWStorage.resetJobsAnalyzed().
+ */
 async function _isNewJob(jobId) {
     if (!jobId) return false;
-    const { ww_analyzed_ids: ids = [] } = await chrome.storage.session.get('ww_analyzed_ids');
+    const result = await new Promise(r => chrome.storage.local.get('ww_analyzed_ids', r));
+    const ids = result.ww_analyzed_ids ?? [];
     if (ids.includes(jobId)) return false;
-    await chrome.storage.session.set({ ww_analyzed_ids: [...ids, jobId] });
+    await new Promise(r => chrome.storage.local.set({ ww_analyzed_ids: [...ids, jobId] }, r));
     return true;
 }
 
