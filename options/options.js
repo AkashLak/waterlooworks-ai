@@ -66,89 +66,99 @@ pdfUploadEl.addEventListener('change', (e) => {
 
 /**
  * Extracts plain text from a PDF ArrayBuffer.
- * Handles both uncompressed and FlateDecode (zlib) compressed content streams
- * using the browser's native DecompressionStream API — no external libraries needed.
+ * Strategy:
+ *   1. Try direct Tj/TJ operator extraction (uncompressed PDFs).
+ *   2. Brute-force scan for zlib magic bytes and decompress each hit using
+ *      the browser's native DecompressionStream — no PDF structure parsing,
+ *      handles FlateDecode streams from Google Docs, Word, and most builders.
  * @param {ArrayBuffer} buffer
  * @returns {Promise<string>}
  */
 async function _extractPdfText(buffer) {
     const bytes = new Uint8Array(buffer);
 
-    // Build a latin-1 string — each character maps 1:1 to a byte so positions match
+    // Build latin-1 string (1 char = 1 byte, positions match)
     const CHUNK = 32768;
     let raw = '';
     for (let i = 0; i < bytes.length; i += CHUNK) {
         raw += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
     }
 
+    // Pass 1: direct extraction — works for uncompressed PDFs
+    const direct = _extractTextOps(raw).trim();
+    if (direct.length > 80) return direct;
+
+    // Pass 2: scan for zlib magic bytes and decompress
+    // All FlateDecode streams start with 0x78 + one of: 0x01, 0x9C, 0xDA, 0x5E
+    const VALID_B2 = new Set([0x01, 0x9C, 0xDA, 0x5E]);
     const parts = [];
+    const seen = new Set(); // skip duplicate streams
 
-    // Find every stream...endstream block in the file
-    const streamRe = /stream\r?\n/g;
-    let m;
-    while ((m = streamRe.exec(raw)) !== null) {
-        const contentStart = m.index + m[0].length;
-        const endIdx = raw.indexOf('endstream', contentStart);
-        if (endIdx === -1) continue;
+    for (let i = 0; i < bytes.length - 1; i++) {
+        if (bytes[i] !== 0x78 || !VALID_B2.has(bytes[i + 1])) continue;
+        if (bytes.length - i < 50) continue;
 
-        // Look back for the object dictionary to check for FlateDecode
-        const dictStart = raw.lastIndexOf('<<', m.index);
-        const dict = dictStart !== -1 ? raw.slice(dictStart, m.index) : '';
-        const isFlate = /FlateDecode|\/Fl[\s/]/.test(dict);
+        try {
+            // Cap each attempt at 512 KB so a bad hit doesn't stall
+            const slice = bytes.subarray(i, Math.min(i + 524288, bytes.length));
+            const decompressed = await _zlibDecompress(slice);
+            if (decompressed.length < 30) continue;
 
-        let content = '';
-        if (isFlate) {
-            try {
-                const compressed = bytes.subarray(contentStart, endIdx);
-                const decompressed = await _zlibDecompress(compressed);
-                content = new TextDecoder('latin1').decode(decompressed);
-            } catch (_) {
-                continue; // stream is not valid zlib, skip it
+            const decompText = new TextDecoder('latin1').decode(decompressed);
+            const extracted = _extractTextOps(decompText).trim();
+            if (extracted.length > 10 && !seen.has(extracted)) {
+                seen.add(extracted);
+                parts.push(extracted);
             }
-        } else {
-            content = raw.slice(contentStart, endIdx);
+        } catch (_) {
+            // Not a valid zlib stream at this offset — move on
         }
-
-        const text = _extractTextOps(content);
-        if (text.length > 10) parts.push(text);
     }
 
     return parts.join(' ').replace(/\s+/g, ' ').trim();
 }
 
 /**
- * Decompress a zlib (FlateDecode) buffer using the browser's DecompressionStream.
- * Tries the zlib wrapper format first, then falls back to raw deflate.
+ * Decompresses a zlib/deflate buffer using the browser's DecompressionStream.
+ * Collects all chunks even if trailing bytes cause a terminal error, since
+ * passing more data than a single stream contains is expected here.
  * @param {Uint8Array} data
  * @returns {Promise<Uint8Array>}
  */
 async function _zlibDecompress(data) {
-    // PDF FlateDecode uses zlib format (deflate + 2-byte header + adler32 checksum)
     for (const format of ['deflate', 'deflate-raw']) {
+        const chunks = [];
         try {
             const ds = new DecompressionStream(format);
             const writer = ds.writable.getWriter();
             const reader = ds.readable.getReader();
-            writer.write(data);
-            writer.close();
 
-            const chunks = [];
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                chunks.push(value);
+            // Errors from trailing bytes after stream end are expected — ignore them
+            writer.write(data).catch(() => {});
+            writer.close().catch(() => {});
+
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                }
+            } catch (_) {
+                // May throw after all valid data has been read
             }
+
+            if (chunks.length === 0) continue;
 
             const total = chunks.reduce((s, c) => s + c.length, 0);
             const out = new Uint8Array(total);
             let off = 0;
             for (const c of chunks) { out.set(c, off); off += c.length; }
-            return out;
+            if (out.length > 10) return out;
         } catch (_) {
-            // try next format
+            // format mismatch, try next
         }
     }
-    throw new Error('Decompression failed');
+    throw new Error('Not a valid zlib stream');
 }
 
 /**
