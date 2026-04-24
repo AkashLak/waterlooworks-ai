@@ -27,9 +27,9 @@ const badgeJobs   = document.getElementById('badge-jobs');
 
     badgeJobs.textContent = `Jobs analyzed: ${jobsAnalyzed ?? 0}`;
 
-    // Model name lives in background.js (imported via config.js) — fetch it safely
-    chrome.runtime.sendMessage({ action: 'getConfig' }, (res) => {
-        badgeModel.textContent = `Model: ${res?.data?.model ?? 'unknown'}`;
+    // Model name is written to storage by background.js on startup
+    chrome.storage.local.get('ww_dev_model', (result) => {
+        badgeModel.textContent = `Model: ${result.ww_dev_model ?? 'see config.js'}`;
     });
 })();
 

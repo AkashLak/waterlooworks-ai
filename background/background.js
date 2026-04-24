@@ -19,6 +19,10 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
     _log('Extension lifecycle event, reason:', reason);
 });
 
+// Write safe config info to storage so dev.html can read it without message passing.
+// GEMINI_API_KEY is intentionally excluded — only the model name is stored.
+chrome.storage.local.set({ ww_dev_model: GEMINI_MODEL }).catch(() => {});
+
 // ── Message router ─────────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -58,10 +62,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             );
             return true;
 
-        case 'getConfig':
-            // Returns safe config info — never exposes GEMINI_API_KEY
-            sendResponse({ success: true, data: { model: GEMINI_MODEL } });
-            return;
 
         default:
             _log('Received unknown action:', message.action);
