@@ -27,13 +27,31 @@ const badgeJobs   = document.getElementById('badge-jobs');
 
     badgeJobs.textContent = `Jobs analyzed: ${jobsAnalyzed ?? 0}`;
 
-    // Get model name from background via a safe config ping
-    chrome.runtime.sendMessage({ action: 'getStats' }, (res) => {
-        // Model name isn't in storage — read it from the config constant if available
-        const model = (typeof GEMINI_MODEL !== 'undefined') ? GEMINI_MODEL : 'see config.js';
-        badgeModel.textContent = `Model: ${model}`;
+    // Model name lives in background.js (imported via config.js) — fetch it safely
+    chrome.runtime.sendMessage({ action: 'getConfig' }, (res) => {
+        badgeModel.textContent = `Model: ${res?.data?.model ?? 'unknown'}`;
     });
 })();
+
+// Keep badges in sync if storage changes in another page (e.g. Options saves a resume)
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (changes.ww_resume) {
+        const resume = changes.ww_resume.newValue;
+        if (resume) {
+            badgeResume.textContent = `Resume: ✓ (${resume.length.toLocaleString()} chars)`;
+            badgeResume.classList.add('badge--ok');
+            badgeResume.classList.remove('badge--err');
+        } else {
+            badgeResume.textContent = 'Resume: ✗ not set';
+            badgeResume.classList.remove('badge--ok');
+            badgeResume.classList.add('badge--err');
+        }
+    }
+    if (changes.ww_jobs_analyzed) {
+        badgeJobs.textContent = `Jobs analyzed: ${changes.ww_jobs_analyzed.newValue ?? 0}`;
+    }
+});
 
 // ── Mode buttons ───────────────────────────────────────────────────────────────
 
