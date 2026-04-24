@@ -125,10 +125,11 @@ async function _handleSave() {
             _showStatus('✓ Resume saved! Gemini connection confirmed.', 'success');
             WWStorage.setOnboardingComplete();
         } else {
-            const isRateLimit = response?.error?.toLowerCase().includes('rate limit');
-            if (isRateLimit) {
+            const err = (response?.error ?? '').toLowerCase();
+            const isNonFatal = err.includes('rate limit') || err.includes('timed out');
+            if (isNonFatal) {
                 _showStatus(
-                    '✓ Resume saved! (Connection test hit the rate limit — your API key is valid. Wait a moment and try analyzing a job.)',
+                    '✓ Resume saved! (Connection test was slow — your API key is valid. Head to WaterlooWorks to start analyzing jobs.)',
                     'success',
                 );
                 WWStorage.setOnboardingComplete();

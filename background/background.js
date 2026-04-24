@@ -151,7 +151,7 @@ async function handleTestConnection() {
     // A 401/403 means the key is genuinely wrong.
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10_000);
+    const timer = setTimeout(() => controller.abort(), 30_000);
 
     let response;
     try {
