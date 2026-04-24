@@ -55,5 +55,10 @@
     "extension_pages": "default-src 'self'; connect-src https://generativelanguage.googleapis.com; script-src 'self'; style-src 'self' 'unsafe-inline'"
   },
 
-  "web_accessible_resources": []
+  "web_accessible_resources": [
+    {
+      "resources": ["lib/pdfjs/pdf.worker.min.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
