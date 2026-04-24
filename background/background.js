@@ -58,6 +58,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             );
             return true;
 
+        case 'getConfig':
+            // Returns safe config info — never exposes GEMINI_API_KEY
+            sendResponse({ success: true, data: { model: GEMINI_MODEL } });
+            return;
+
         default:
             _log('Received unknown action:', message.action);
     }
