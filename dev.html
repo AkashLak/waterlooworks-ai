@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>WaterlooWorks AI — Dev Console</title>
+    <link rel="stylesheet" href="dev.css">
+</head>
+<body>
+
+    <header class="header">
+        <span class="header__title">WaterlooWorks AI — Dev Console</span>
+        <div class="header__status">
+            <span class="badge" id="badge-resume">Resume: —</span>
+            <span class="badge" id="badge-model">Model: —</span>
+            <span class="badge" id="badge-jobs">Jobs: —</span>
+        </div>
+    </header>
+
+    <div class="layout">
+
+        <!-- ── Left: inputs ── -->
+        <section class="panel panel--left">
+
+            <h2 class="panel__title">Mock Job</h2>
+
+            <div class="field-row">
+                <input id="job-title" class="input" type="text"
+                    value="Software Developer Intern" placeholder="Job title">
+                <input id="job-employer" class="input" type="text"
+                    value="Acme Financial Services" placeholder="Employer">
+            </div>
+
+            <textarea id="job-desc" class="textarea" spellcheck="false">Position: Software Developer Intern
+Company: Acme Financial Services
+
+Job Summary:
+Acme Financial Services is looking for a Software Developer Intern to join our Core Banking team for a 4-month co-op term. You will work with senior engineers to build and maintain features in our retail banking platform serving over 2 million customers.
+
+Job Responsibilities:
+- Design and implement features in our Java Spring Boot microservices architecture
+- Write unit and integration tests using JUnit and Mockito
+- Participate in code reviews and technical design discussions
+- Work with PostgreSQL and Redis for data storage and caching
+- Deploy services to AWS using our CI/CD pipeline (Jenkins, Docker, Kubernetes)
+- Collaborate with product managers and UX designers in an agile environment
+- Debug production issues and document runbooks
+
+Required Skills:
+- Enrolled in Computer Science, Software Engineering, or related program
+- Proficiency in Java or Python
+- Understanding of REST API design and HTTP protocols
+- Familiarity with Git and version control
+- Strong problem-solving and communication skills
+
+Nice to have:
+- Experience with Spring Boot or similar frameworks
+- Knowledge of containerization (Docker, Kubernetes)
+- Previous co-op experience in a software development role</textarea>
+
+            <div class="mode-grid">
+                <button class="btn btn--mode" data-mode="BEST_FIT">📊 Analyze Fit</button>
+                <button class="btn btn--mode" data-mode="DREAM_JOB">⭐ Dream Job?</button>
+                <button class="btn btn--mode" data-mode="QA_SNIFF">🔍 Sniff Test</button>
+                <button class="btn btn--mode" data-mode="ROLE_EXPLAINER">💼 Explain Role</button>
+            </div>
+
+            <div class="ask-row">
+                <input id="ask-input" class="input" type="text"
+                    placeholder="Ask anything about this job…">
+                <button class="btn btn--ask" id="btn-ask">Ask</button>
+            </div>
+
+            <div class="util-row">
+                <button class="btn btn--util" id="btn-reset-stats">Reset job count</button>
+                <button class="btn btn--util btn--danger" id="btn-clear-resume">Clear resume</button>
+            </div>
+
+        </section>
+
+        <!-- ── Right: output ── -->
+        <section class="panel panel--right">
+
+            <div class="output-header">
+                <h2 class="panel__title" id="output-label">Output</h2>
+                <button class="btn btn--util" id="btn-copy">Copy</button>
+            </div>
+
+            <div class="output-box" id="output-box">
+                <span class="output-placeholder">Run an analysis to see results here.</span>
+            </div>
+
+        </section>
+
+    </div>
+
+    <script src="lib/storage.js"></script>
+    <script src="dev.js"></script>
+</body>
+</html>

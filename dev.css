@@ -1,0 +1,154 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 13px;
+    color: #1a1a1a;
+    background: #f0f0f0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+
+.header {
+    background: #1a1a1a;
+    color: #FFC72C;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+.header__title { font-weight: 800; font-size: 14px; }
+.header__status { display: flex; gap: 8px; align-items: center; }
+
+.badge {
+    background: #333;
+    color: #ccc;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+.badge--ok  { background: #166534; color: #86efac; }
+.badge--err { background: #991b1b; color: #fca5a5; }
+
+/* ── Layout ────────────────────────────────────────────────────────────────── */
+
+.layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 12px;
+    flex: 1;
+    min-height: 0;
+}
+
+.panel {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: hidden;
+}
+.panel__title { font-size: 13px; font-weight: 700; color: #444; }
+
+/* ── Inputs ────────────────────────────────────────────────────────────────── */
+
+.field-row { display: flex; gap: 8px; }
+
+.input {
+    flex: 1;
+    padding: 7px 10px;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.12s;
+}
+.input:focus { border-color: #FFC72C; }
+
+.textarea {
+    flex: 1;
+    min-height: 240px;
+    padding: 10px 12px;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 6px;
+    font-family: 'Menlo', 'Consolas', monospace;
+    font-size: 11px;
+    line-height: 1.55;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.12s;
+}
+.textarea:focus { border-color: #FFC72C; }
+
+/* ── Mode buttons ──────────────────────────────────────────────────────────── */
+
+.mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+.btn {
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    border: 1.5px solid transparent;
+    transition: background 0.12s, border-color 0.12s;
+}
+.btn--mode {
+    background: #fff;
+    border-color: #1a1a1a;
+    color: #1a1a1a;
+}
+.btn--mode:hover   { background: #FFC72C; border-color: #FFC72C; }
+.btn--mode.loading { opacity: 0.5; cursor: not-allowed; }
+
+.ask-row { display: flex; gap: 6px; }
+.btn--ask {
+    background: #1a1a1a;
+    color: #FFC72C;
+    border-color: #1a1a1a;
+    white-space: nowrap;
+}
+.btn--ask:hover { background: #333; }
+
+.util-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn--util {
+    background: none;
+    border-color: #e0e0e0;
+    color: #555;
+    font-size: 11px;
+    padding: 5px 10px;
+}
+.btn--util:hover  { border-color: #aaa; color: #1a1a1a; }
+.btn--danger      { color: #991b1b; border-color: #fca5a5; }
+.btn--danger:hover { background: #fee2e2; border-color: #f87171; }
+
+/* ── Output ────────────────────────────────────────────────────────────────── */
+
+.output-header { display: flex; align-items: center; justify-content: space-between; }
+
+.output-box {
+    flex: 1;
+    background: #f8f8f8;
+    border: 1px solid #e4e4e4;
+    border-radius: 6px;
+    padding: 12px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    font-family: 'Menlo', 'Consolas', monospace;
+    min-height: 0;
+}
+.output-placeholder { color: #aaa; font-style: italic; font-family: inherit; }
+.output-error       { color: #991b1b; }
+.output-loading     { color: #888; animation: pulse 1.2s ease-in-out infinite; }
+
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
