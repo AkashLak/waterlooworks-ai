@@ -15,3 +15,6 @@ const GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
  * @type {boolean}
  */
 const DEV_MODE = false;
+
+/** @type {string} Shared secret for authenticating requests to the WaterlooWorks AI backend */
+const API_SECRET = "YOUR_API_SECRET_HERE";

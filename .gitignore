@@ -2,6 +2,9 @@
 config.js
 !config.example.js
 
+# Claude Code
+CLAUDE.md
+
 # Logs
 logs
 *.log
