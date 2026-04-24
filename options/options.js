@@ -151,16 +151,22 @@ async function _zlibDecompress(data) {
     throw new Error('Decompression failed');
 }
 
-/** Extracts text from PDF content stream operators (Tj and TJ). */
+/**
+ * Extracts text from a PDF content stream.
+ * Handles both literal strings — (text) Tj — and hex-encoded strings — <hex> Tj.
+ * Hex encoding is used by CIDFont PDFs (Google Docs, Word, most resume builders).
+ */
 function _extractTextOps(content) {
     const parts = [];
     let m;
 
+    // Literal string: (text) Tj
     const tjRe = /\(([^)\\]|\\.)*\)\s*Tj/g;
     while ((m = tjRe.exec(content)) !== null) {
         parts.push(_decodePdfString(m[0].slice(1, m[0].lastIndexOf(')'))));
     }
 
+    // Literal string array: [(text) spacing ...] TJ
     const tjArrRe = /\[([^\]]*)\]\s*TJ/g;
     while ((m = tjArrRe.exec(content)) !== null) {
         const strRe = /\(([^)\\]|\\.)*\)/g;
@@ -170,7 +176,49 @@ function _extractTextOps(content) {
         }
     }
 
+    // Hex string: <0041006B...> Tj  (CIDFont — most modern PDFs)
+    const hexTjRe = /<([0-9A-Fa-f]{2,})>\s*Tj/g;
+    while ((m = hexTjRe.exec(content)) !== null) {
+        const t = _decodeHexPdfString(m[1]);
+        if (t) parts.push(t);
+    }
+
+    // Hex string array: [<hex> spacing ...] TJ  (CIDFont)
+    const hexArrRe = /\[([^\]]*)\]\s*TJ/g;
+    while ((m = hexArrRe.exec(content)) !== null) {
+        const hexStrRe = /<([0-9A-Fa-f]{2,})>/g;
+        let sm;
+        while ((sm = hexStrRe.exec(m[1])) !== null) {
+            const t = _decodeHexPdfString(sm[1]);
+            if (t) parts.push(t);
+        }
+    }
+
     return parts.join(' ').trim();
+}
+
+/**
+ * Decodes a hex-encoded PDF string.
+ * Tries 2-byte Unicode (4 hex chars per character) first — used by CIDFont.
+ * Falls back to 1-byte Latin-1 if the 2-byte pass produces no readable text.
+ */
+function _decodeHexPdfString(hex) {
+    // 2-byte Unicode (common in Google Docs / Word PDFs)
+    if (hex.length % 4 === 0) {
+        let out = '';
+        for (let i = 0; i < hex.length; i += 4) {
+            const cp = parseInt(hex.slice(i, i + 4), 16);
+            if (cp > 0x001F && cp < 0xFFFE) out += String.fromCodePoint(cp);
+        }
+        if (out.replace(/\s/g, '').length > 0) return out;
+    }
+    // 1-byte Latin-1 fallback
+    let out = '';
+    for (let i = 0; i + 1 <= hex.length; i += 2) {
+        const cp = parseInt(hex.slice(i, i + 2), 16);
+        if (cp > 0x1F && cp < 0x80) out += String.fromCharCode(cp);
+    }
+    return out;
 }
 
 function _decodePdfString(s) {
