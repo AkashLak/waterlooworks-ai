@@ -76,7 +76,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             );
             return true;
 
-
         default:
             _log('Received unknown action:', message.action);
     }
