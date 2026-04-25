@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "WaterlooWorks AI Assistant",
-  "version": "1.0.0",
-  "description": "AI-powered job analysis for WaterlooWorks co-op students. Powered by Google Gemini.",
+  "version": "2.0.0",
+  "description": "AI-powered job analysis for WaterlooWorks co-op students.",
 
   "permissions": [
     "storage",
@@ -12,7 +12,7 @@
 
   "host_permissions": [
     "*://waterlooworks.uwaterloo.ca/*",
-    "https://generativelanguage.googleapis.com/*"
+    "https://waterlooworks-ai-backend-production.up.railway.app/*"
   ],
 
   "background": {
@@ -26,6 +26,8 @@
         "lib/storage.js",
         "lib/scraper.js",
         "lib/analyzer.js",
+        "content/renderers.js",
+        "content/handlers.js",
         "content/content.js"
       ],
       "css": ["content/panel.css"],
@@ -52,7 +54,7 @@
   },
 
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; connect-src https://generativelanguage.googleapis.com; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    "extension_pages": "default-src 'self'; connect-src https://waterlooworks-ai-backend-production.up.railway.app; script-src 'self'; style-src 'self' 'unsafe-inline'"
   },
 
   "web_accessible_resources": [
