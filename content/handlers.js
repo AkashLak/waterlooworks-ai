@@ -122,7 +122,7 @@ async function _onTableChange() {
         const jobsMap  = {};
         for (const job of jobs) { if (job.jobId) jobsMap[job.jobId] = job; }
         _injectPrecomputedBadges(WWScaper.scrapeAllListingRows(), jobsMap);
-        _updateStatusLine(response.total ?? jobs.length);
+        _updateStatusLine(response.totalJobs ?? response.total ?? jobs.length);
     } catch (_) {}
 }
 
@@ -210,7 +210,7 @@ function _updateStatusLine(jobCount) {
 async function _refreshStatus() {
     try {
         const status = await WWAnalyzer.getStatus();
-        _updateStatusLine(status.jobCount ?? status.total ?? 0);
+        _updateStatusLine(status.totalJobs ?? status.jobCount ?? 0);
     } catch (_) {}
 }
 
