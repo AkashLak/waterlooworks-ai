@@ -49,13 +49,16 @@ async function _submitAndPoll(detail) {
     const rawOpenings = row.openings || fresh.openings || '';
     const jobData = {
         ...fresh,
-        location:     row.location     || fresh.location    || '',
-        city:         row.city         || fresh.city        || '',
-        openings:     parseInt(rawOpenings, 10) || null,
-        term:         row.term         || fresh.term        || '',
-        deadline:     row.appDeadline  || fresh.appDeadline || null,
-        organization: row.organization || fresh.employer    || '',
-        description:  WWScaper.extractJobDescription(fresh) || null,
+        location:              row.location     || fresh.location    || '',
+        city:                  row.city         || fresh.city        || '',
+        openings:              parseInt(rawOpenings, 10) || null,
+        term:                  row.term         || fresh.term        || '',
+        deadline:              row.appDeadline  || fresh.appDeadline || null,
+        organization:          row.organization || fresh.employer    || '',
+        description:           WWScaper.extractJobDescription(fresh) || null,
+        // WaterlooWorks label → camelCase key differs from what backend expects
+        employmentArrangement: fresh.employmentLocationArrangement   || '',
+        externalUrl:           fresh.ifByWebsiteGoTo                 || '',
     };
 
     let submitResult;
