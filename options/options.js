@@ -109,7 +109,7 @@ async function _handleSave() {
     await WWStorage.saveResume(text);
     _setResumeCheck(true);
 
-    // Test that the Gemini API key works
+    // Test that the backend is reachable
     chrome.runtime.sendMessage({ action: 'testConnection' }, (response) => {
         saveBtn.disabled = false;
 
@@ -122,23 +122,13 @@ async function _handleSave() {
         }
 
         if (response?.success) {
-            _showStatus('✓ Resume saved! Gemini connection confirmed.', 'success');
+            _showStatus('✓ Resume saved! Backend connection confirmed.', 'success');
             WWStorage.setOnboardingComplete();
         } else {
-            const err = (response?.error ?? '').toLowerCase();
-            const isNonFatal = err.includes('rate limit') || err.includes('timed out');
-            if (isNonFatal) {
-                _showStatus(
-                    '✓ Resume saved! (Connection test was slow — your API key is valid. Head to WaterlooWorks to start analyzing jobs.)',
-                    'success',
-                );
-                WWStorage.setOnboardingComplete();
-            } else {
-                _showStatus(
-                    `Resume saved, but Gemini connection failed: ${response?.error ?? 'unknown error'}. Check your API key in config.js.`,
-                    'error',
-                );
-            }
+            _showStatus(
+                'Resume saved, but could not reach the backend. Check your connection and try again.',
+                'error',
+            );
         }
     });
 }
