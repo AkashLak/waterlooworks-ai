@@ -58,7 +58,7 @@ async function _submitAndPoll(detail) {
         description:           WWScaper.extractJobDescription(fresh) || null,
         // WaterlooWorks label → camelCase key differs from what backend expects
         employmentArrangement: fresh.employmentLocationArrangement   || '',
-        externalUrl:           fresh.ifByWebsiteGoTo                 || '',
+        externalUrl:           fresh.ifByWebsiteGoTo || fresh.ifByEmailSendTo || '',
     };
 
     let submitResult;
