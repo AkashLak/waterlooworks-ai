@@ -26,7 +26,7 @@ async function _submitAndPoll(detail) {
         city:         row.city        || detail.city        || '',
         openings:     parseInt(rawOpenings, 10) || null,
         term:         row.term        || detail.term        || '',
-        appDeadline:  row.appDeadline || detail.appDeadline || null,
+        deadline:     row.appDeadline || detail.appDeadline || null,
         organization: row.organization || detail.employer   || '',
         description:  WWScaper.extractJobDescription(detail) || null,
     };
