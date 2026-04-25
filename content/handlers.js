@@ -58,7 +58,7 @@ async function _submitAndPoll(detail) {
         description:           WWScaper.extractJobDescription(fresh) || null,
         // WaterlooWorks label → camelCase key differs from what backend expects
         employmentArrangement: fresh.employmentLocationArrangement   || '',
-        externalUrl:           fresh.ifByWebsiteGoTo || fresh.ifByEmailSendTo || '',
+        externalUrl:           _decodeHtml(fresh.ifByWebsiteGoTo || fresh.ifByEmailSendTo || ''),
     };
 
     let submitResult;
@@ -237,6 +237,13 @@ async function _refreshStatus() {
 // ── Batch analysis ─────────────────────────────────────────────────────────────
 
 function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function _decodeHtml(str) {
+    if (!str) return str;
+    const el = document.createElement('textarea');
+    el.innerHTML = str;
+    return el.value;
+}
 
 async function _handleBatch() {
     if (_batchRunning) return;
