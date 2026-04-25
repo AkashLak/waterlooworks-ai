@@ -12,12 +12,21 @@ let _pollCount = 0;
 
 /**
  * Submits the open job to the backend, then polls for analyses if it's a new job.
- * Non-fatal — panel remains usable if submission fails.
+ * Merges modal data with table-row data — location/city/openings/term/deadline are
+ * only reliably available in the row, not the modal.
  * @param {Object} detail - Output of WWScaper.scrapeJobDetail()
  */
 async function _submitAndPoll(detail) {
+    // The table row stays in the DOM while the modal overlay is open.
+    const row = WWScaper.scrapeRowByJobId(detail.jobId) ?? {};
     const jobData = {
         ...detail,
+        location: row.location || detail.location || '',
+        city: row.city || detail.city || '',
+        openings: row.openings || detail.openings || '',
+        term: row.term || detail.term || '',
+        appDeadline: row.appDeadline || detail.appDeadline || '',
+        organization: row.organization || detail.employer || '',
         description: WWScaper.extractJobDescription(detail),
     };
 
@@ -69,8 +78,8 @@ async function _pollTick(jobId) {
 
 function _clearPolling() {
     clearTimeout(_pollTimer);
-    _pollTimer  = null;
-    _pollCount  = 0;
+    _pollTimer = null;
+    _pollCount = 0;
 }
 
 function _showRetryPolling(jobId) {
@@ -85,11 +94,7 @@ function _showRetryPolling(jobId) {
     btn.className = 'wwai-btn wwai-btn--full';
     btn.style.marginTop = '8px';
     btn.textContent = 'Retry';
-    btn.addEventListener('click', () => {
-        container.innerHTML = '';
-        container.classList.add('wwai-hidden');
-        _startPolling(jobId);
-    });
+    btn.addEventListener('click', () => { container.innerHTML = ''; container.classList.add('wwai-hidden'); _startPolling(jobId); });
     card.appendChild(p);
     card.appendChild(btn);
     container.appendChild(card);
@@ -178,21 +183,15 @@ async function _handleAsk(question) {
 
 // ── Smart Suggestions ──────────────────────────────────────────────────────────
 
-const SEARCH_LABELS = {
-    top_fits:     'Top 5 Fits',
-    closing_soon: 'Closing Soon',
-    dream_jobs:   'Dream Jobs',
-    qa_disguised: 'QA in Disguise',
-    remote_hybrid: 'Remote & Hybrid',
-};
+const SEARCH_LABELS = { top_fits: 'Top 5 Fits', closing_soon: 'Closing Soon', dream_jobs: 'Dream Jobs', qa_disguised: 'QA in Disguise', remote_hybrid: 'Remote & Hybrid' };
 
 async function _handleSearch(searchType) {
     _setLoading(`Searching ${SEARCH_LABELS[searchType] ?? searchType}…`);
     _clearResult();
     try {
         const criteria = { type: searchType, limit: searchType === 'top_fits' ? 5 : 20 };
-        const result   = await WWAnalyzer.searchJobs(criteria);
-        const jobs     = result.jobs ?? (Array.isArray(result) ? result : []);
+        const result = await WWAnalyzer.searchJobs(criteria);
+        const jobs = result.jobs ?? (Array.isArray(result) ? result : []);
         _renderResult('SEARCH_RESULTS', jobs);
     } catch (err) {
         _renderError(err);
@@ -235,14 +234,13 @@ async function _handleBatch() {
         for (const job of jobs) { if (job.jobId) allJobsMap[job.jobId] = job; }
     } catch (_) {}
 
-    const rows  = WWScaper.scrapeAllListingRows();
+    const rows = WWScaper.scrapeAllListingRows();
     const stats = { great: 0, decent: 0, poor: 0, disguised: 0 };
     let unseenCount = 0;
     let scoredCount = 0;
 
     for (let i = 0; i < rows.length; i++) {
         if (WWAnalyzer.isBatchCancelled()) break;
-
         const row    = rows[i];
         const jobRec = allJobsMap[row.jobId];
 
