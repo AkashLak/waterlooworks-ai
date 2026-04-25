@@ -190,3 +190,38 @@
 .wwai-footer  { padding: 7px 14px; text-align: center; font-size: 11px; color: #bbb; border-top: 1px solid #ebebeb; flex-shrink: 0; }
 .wwai-hidden  { display: none !important; }
 .wwai-verdict { font-weight: 600; margin: 4px 0 8px; }
+
+/* ── Smart Suggestions ─────────────────────────────────────────────────────── */
+
+.wwai-suggestions {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.wwai-suggestions__title {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.6px; color: #888; margin-bottom: 2px;
+}
+.wwai-btn--suggestion {
+    text-align: left;
+    font-size: 12px;
+    padding: 7px 10px;
+    font-weight: 600;
+}
+.wwai-status-line {
+    font-size: 11px;
+    color: #bbb;
+    text-align: center;
+    padding-top: 4px;
+}
+
+/* ── Search results ────────────────────────────────────────────────────────── */
+
+.wwai-search-result {
+    padding: 6px 0;
+    border-bottom: 1px solid #ebebeb;
+}
+.wwai-search-result:last-child      { border-bottom: none; }
+.wwai-search-result__title          { font-weight: 600; font-size: 12px; }
+.wwai-search-result__meta           { font-size: 11px; color: #888; margin-top: 1px; }
+.wwai-search-result__reason         { font-size: 11px; color: #555; margin-top: 2px; font-style: italic; }
