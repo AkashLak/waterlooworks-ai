@@ -19,15 +19,16 @@ let _pollCount = 0;
 async function _submitAndPoll(detail) {
     // The table row stays in the DOM while the modal overlay is open.
     const row = WWScaper.scrapeRowByJobId(detail.jobId) ?? {};
+    const rawOpenings = row.openings || detail.openings || '';
     const jobData = {
         ...detail,
-        location: row.location || detail.location || '',
-        city: row.city || detail.city || '',
-        openings: row.openings || detail.openings || '',
-        term: row.term || detail.term || '',
-        appDeadline: row.appDeadline || detail.appDeadline || '',
-        organization: row.organization || detail.employer || '',
-        description: WWScaper.extractJobDescription(detail),
+        location:     row.location    || detail.location    || '',
+        city:         row.city        || detail.city        || '',
+        openings:     parseInt(rawOpenings, 10) || null,
+        term:         row.term        || detail.term        || '',
+        appDeadline:  row.appDeadline || detail.appDeadline || null,
+        organization: row.organization || detail.employer   || '',
+        description:  WWScaper.extractJobDescription(detail) || null,
     };
 
     let submitResult;
