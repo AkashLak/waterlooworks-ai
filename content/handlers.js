@@ -11,24 +11,51 @@ let _pollCount = 0;
 // ── Job submission and analysis polling ────────────────────────────────────────
 
 /**
+ * Waits until the open modal has populated its content fields, or timeoutMs elapses.
+ * WaterlooWorks opens the modal shell before fetching job detail via an internal API.
+ */
+function _waitForModalContent(timeoutMs = 2500) {
+    const modal = WWScaper.getActiveModal();
+    if (!modal) return Promise.resolve();
+    if (modal.querySelector('.tag__key-value-list p')?.textContent?.trim()) return Promise.resolve();
+    return new Promise((resolve) => {
+        const timer = setTimeout(() => { observer.disconnect(); resolve(); }, timeoutMs);
+        const observer = new MutationObserver(() => {
+            if (modal.querySelector('.tag__key-value-list p')?.textContent?.trim()) {
+                clearTimeout(timer); observer.disconnect(); resolve();
+            }
+        });
+        observer.observe(modal, { subtree: true, childList: true });
+    });
+}
+
+/**
  * Submits the open job to the backend, then polls for analyses if it's a new job.
  * Merges modal data with table-row data — location/city/openings/term/deadline are
  * only reliably available in the row, not the modal.
  * @param {Object} detail - Output of WWScaper.scrapeJobDetail()
  */
 async function _submitAndPoll(detail) {
-    // The table row stays in the DOM while the modal overlay is open.
-    const row = WWScaper.scrapeRowByJobId(detail.jobId) ?? {};
-    const rawOpenings = row.openings || detail.openings || '';
+    // Wait for WaterlooWorks to finish loading modal content before scraping.
+    await _waitForModalContent();
+
+    // Re-scrape now that content fields are populated. Bail if modal was closed.
+    const modal = WWScaper.getActiveModal();
+    if (!modal) return;
+    const fresh = WWScaper.scrapeJobDetail(modal) ?? detail;
+    if (fresh.jobId !== detail.jobId) return;
+
+    const row = WWScaper.scrapeRowByJobId(fresh.jobId) ?? {};
+    const rawOpenings = row.openings || fresh.openings || '';
     const jobData = {
-        ...detail,
-        location:     row.location    || detail.location    || '',
-        city:         row.city        || detail.city        || '',
+        ...fresh,
+        location:     row.location     || fresh.location    || '',
+        city:         row.city         || fresh.city        || '',
         openings:     parseInt(rawOpenings, 10) || null,
-        term:         row.term        || detail.term        || '',
-        deadline:     row.appDeadline || detail.appDeadline || null,
-        organization: row.organization || detail.employer   || '',
-        description:  WWScaper.extractJobDescription(detail) || null,
+        term:         row.term         || fresh.term        || '',
+        deadline:     row.appDeadline  || fresh.appDeadline || null,
+        organization: row.organization || fresh.employer    || '',
+        description:  WWScaper.extractJobDescription(fresh) || null,
     };
 
     let submitResult;
@@ -95,10 +122,12 @@ function _showRetryPolling(jobId) {
     btn.className = 'wwai-btn wwai-btn--full';
     btn.style.marginTop = '8px';
     btn.textContent = 'Retry';
-    btn.addEventListener('click', () => { container.innerHTML = ''; container.classList.add('wwai-hidden'); _startPolling(jobId); });
-    card.appendChild(p);
-    card.appendChild(btn);
-    container.appendChild(card);
+    btn.addEventListener('click', () => {
+        container.innerHTML = '';
+        container.classList.add('wwai-hidden');
+        _startPolling(jobId);
+    });
+    card.appendChild(p); card.appendChild(btn); container.appendChild(card);
 }
 
 // ── Table sync ─────────────────────────────────────────────────────────────────
@@ -123,7 +152,7 @@ async function _onTableChange() {
         const jobsMap  = {};
         for (const job of jobs) { if (job.jobId) jobsMap[job.jobId] = job; }
         _injectPrecomputedBadges(WWScaper.scrapeAllListingRows(), jobsMap);
-        _updateStatusLine(response.totalJobs ?? response.total ?? jobs.length);
+        _refreshStatus();
     } catch (_) {}
 }
 
@@ -133,37 +162,24 @@ async function _handleFitScore() {
     if (!_currentJobId) return;
     const cached = _getCached(_currentJobId, 'BEST_FIT');
     if (cached) { _renderResult('BEST_FIT', cached); return; }
-
-    _setLoading('Analyzing fit…');
-    _clearResult();
+    _setLoading('Analyzing fit…'); _clearResult();
     try {
         const result = await WWAnalyzer.getFitScore(_currentJobId);
         _setCached(_currentJobId, 'BEST_FIT', result);
         _renderResult('BEST_FIT', result);
-    } catch (err) {
-        _renderError(err);
-    } finally {
-        _clearLoading();
-    }
+    } catch (err) { _renderError(err); } finally { _clearLoading(); }
 }
 
 async function _handlePrecomputed(mode) {
     if (!_currentJobId) return;
     const cached = _getCached(_currentJobId, mode);
     if (cached) { _renderResult(mode, cached); return; }
-
     const KEY_MAP = { DREAM_JOB: 'dreamJob', QA_SNIFF: 'qaSniff', ROLE_EXPLAINER: 'roleExplainer' };
     const key = KEY_MAP[mode];
     const data = key && _currentAnalyses ? _currentAnalyses[key] : null;
-
-    if (data) {
-        _setCached(_currentJobId, mode, data);
-        _renderResult(mode, data);
-    } else if (_pollTimer) {
-        _renderError({ message: 'Analysis in progress — please wait a moment and try again.' });
-    } else {
-        _renderError({ message: 'Analysis not yet available. Try reopening this job.' });
-    }
+    if (data) { _setCached(_currentJobId, mode, data); _renderResult(mode, data); }
+    else if (_pollTimer) _renderError({ message: 'Analysis in progress — please wait a moment and try again.' });
+    else _renderError({ message: 'Analysis not yet available. Try reopening this job.' });
 }
 
 async function _handleAsk(question) {
@@ -237,22 +253,16 @@ async function _handleBatch() {
 
     const rows = WWScaper.scrapeAllListingRows();
     const stats = { great: 0, decent: 0, poor: 0, disguised: 0 };
-    let unseenCount = 0;
-    let scoredCount = 0;
+    let unseenCount = 0, scoredCount = 0;
+    const bar = document.getElementById('wwai-batch-bar'), txt = document.getElementById('wwai-batch-text');
 
     for (let i = 0; i < rows.length; i++) {
         if (WWAnalyzer.isBatchCancelled()) break;
-        const row    = rows[i];
+        const row = rows[i];
         const jobRec = allJobsMap[row.jobId];
+        bar.style.width = `${Math.round(((i + 1) / rows.length) * 100)}%`;
 
-        document.getElementById('wwai-batch-bar').style.width =
-            `${Math.round(((i + 1) / rows.length) * 100)}%`;
-
-        if (!jobRec) {
-            unseenCount++;
-            _injectBadge(row, null, false);
-            continue;
-        }
+        if (!jobRec) { unseenCount++; _injectBadge(row, null, false); continue; }
 
         const isQa = jobRec.qaResult ? !jobRec.qaResult.titleMatchesRole : false;
         if (isQa) stats.disguised++;
@@ -262,32 +272,23 @@ async function _handleBatch() {
             _tallyStat(stats, jobRec.fitScore);
             scoredCount++;
         } else {
-            document.getElementById('wwai-batch-text').textContent =
-                `Scoring job ${scoredCount + 1} of ${rows.length - unseenCount}…`;
+            txt.textContent = `Scoring job ${scoredCount + 1} of ${rows.length - unseenCount}…`;
             try {
                 const fit = await WWAnalyzer.getFitScore(row.jobId);
                 _injectBadge(row, fit.fitScore, isQa);
                 _tallyStat(stats, fit.fitScore);
                 scoredCount++;
                 await _sleep(BATCH_DELAY_MS);
-            } catch (_) {
-                _injectBadge(row, null, isQa);
-            }
+            } catch (_) { _injectBadge(row, null, isQa); }
         }
     }
 
     _batchRunning = false;
     _hide('wwai-batch-progress');
-
-    const parts = [
-        `🟢 ${stats.great} great fits`,
-        `🟡 ${stats.decent} decent matches`,
-        `🔴 ${stats.poor} poor fits`,
-    ];
-    if (stats.disguised)   parts.push(`⚠️ ${stats.disguised} QA in disguise`);
-    if (unseenCount)       parts.push(`${unseenCount} not yet analyzed — click to add`);
+    const parts = [`🟢 ${stats.great} great fits`, `🟡 ${stats.decent} decent matches`, `🔴 ${stats.poor} poor fits`];
+    if (stats.disguised) parts.push(`⚠️ ${stats.disguised} QA in disguise`);
+    if (unseenCount) parts.push(`${unseenCount} not yet analyzed — click to add`);
     if (WWAnalyzer.isBatchCancelled()) parts.push('(cancelled)');
-
     const summaryEl = document.getElementById('wwai-batch-summary');
     summaryEl.textContent = parts.join(' · ');
     _show('wwai-batch-summary');
