@@ -121,7 +121,7 @@ function _handleModeClick(mode) {
 
 // ── Job change detection (MutationObserver) ────────────────────────────────────
 
-new MutationObserver(() => {
+new MutationObserver((mutations) => {
     const modal = WWScaper.getActiveModal();
     if (modal) {
         const detail = WWScaper.scrapeJobDetail(modal);
@@ -139,8 +139,18 @@ new MutationObserver(() => {
         _clearPolling();
         _onJobClose();
         _scheduleTableSync();
+    } else {
+        // Detect when the XHR-rendered job table inserts rows into the DOM
+        const hasNewRows = mutations.some(m =>
+            m.type === 'childList' &&
+            Array.from(m.addedNodes).some(n =>
+                n.nodeType === Node.ELEMENT_NODE &&
+                (n.matches('tr.table__row--body') || n.querySelector('tr.table__row--body'))
+            )
+        );
+        if (hasNewRows) _scheduleTableSync();
     }
-}).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+}).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
 
 function _onJobOpen(detail) {
     document.getElementById('wwai-job-title').textContent    = detail.title;
