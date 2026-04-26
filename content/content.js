@@ -24,16 +24,21 @@ function _buildPanel() {
             <button class="wwai-header__close" aria-label="Close">✕</button>
         </div>
         <div class="wwai-body">
+            <div class="wwai-resume-status" id="wwai-resume-status"></div>
             <div class="wwai-empty" id="wwai-empty">Click a job title to start analyzing.</div>
             <div class="wwai-job-info wwai-hidden" id="wwai-job-info">
-                <div class="wwai-job-info__title"    id="wwai-job-title"></div>
-                <div class="wwai-job-info__employer" id="wwai-job-employer"></div>
+                <div class="wwai-job-info__title"   id="wwai-job-title"></div>
+                <div class="wwai-job-info__meta"    id="wwai-job-meta"></div>
+                <div class="wwai-job-info__sniff wwai-hidden" id="wwai-sniff-flag">⚠️ Title may not match this role</div>
+                <div class="wwai-job-info__preview wwai-hidden" id="wwai-role-preview"></div>
             </div>
             <div class="wwai-actions wwai-hidden" id="wwai-actions">
-                <button class="wwai-btn" data-mode="BEST_FIT">📊 Analyze Fit</button>
-                <button class="wwai-btn" data-mode="DREAM_JOB">⭐ Dream Job?</button>
-                <button class="wwai-btn" data-mode="QA_SNIFF">🔍 Sniff Test</button>
-                <button class="wwai-btn" data-mode="ROLE_EXPLAINER">💼 Explain Role</button>
+                <button class="wwai-btn wwai-btn--full wwai-btn--primary" data-mode="SHOULD_APPLY">✅ Should I Apply?</button>
+                <div class="wwai-actions__row">
+                    <button class="wwai-btn" data-mode="BEST_FIT">📊 Analyze Fit</button>
+                    <button class="wwai-btn" data-mode="DREAM_JOB">⭐ Dream Job?</button>
+                    <button class="wwai-btn" data-mode="ROLE_EXPLAINER">💼 Explain Role</button>
+                </div>
             </div>
             <div class="wwai-loading wwai-hidden" id="wwai-loading">
                 <div class="wwai-spinner"></div>
@@ -48,7 +53,7 @@ function _buildPanel() {
             </div>
             <hr class="wwai-divider">
             <button class="wwai-btn wwai-btn--full wwai-btn--gold" id="wwai-batch-btn">
-                📋 Analyze All Visible Jobs
+                📋 Score All Jobs
             </button>
             <div id="wwai-batch-progress" class="wwai-hidden">
                 <div class="wwai-progress">
@@ -63,11 +68,13 @@ function _buildPanel() {
             <hr class="wwai-divider">
             <div class="wwai-suggestions">
                 <div class="wwai-suggestions__title">Smart Suggestions</div>
-                <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="top_fits">🎯 Top 5 Fits for Me</button>
                 <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="closing_soon">⏰ Closing Soon</button>
-                <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="dream_jobs">🚀 Dream Jobs This Cycle</button>
-                <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="qa_disguised">⚠️ QA in Disguise</button>
-                <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="remote_hybrid">🏠 Remote &amp; Hybrid Only</button>
+                <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="top_fits">🎯 Top 5 Fits for Me</button>
+                <div class="wwai-search-bar">
+                    <input class="wwai-search-bar__input" id="wwai-search-input" type="text"
+                        placeholder="Search jobs… e.g. remote, Toronto, data science">
+                    <button class="wwai-btn wwai-btn--full" id="wwai-search-btn">🔍 Search</button>
+                </div>
                 <div class="wwai-status-line" id="wwai-status-line"></div>
             </div>
         </div>
@@ -93,6 +100,11 @@ function _wireEvents(panel) {
     document.getElementById('wwai-ask-btn').addEventListener('click', submit);
     askInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
 
+    const searchInput = document.getElementById('wwai-search-input');
+    const searchGo = () => { const q = searchInput.value.trim(); if (q) _handleFreeSearch(q); };
+    document.getElementById('wwai-search-btn').addEventListener('click', searchGo);
+    searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchGo(); });
+
     document.getElementById('wwai-batch-btn').addEventListener('click', _handleBatch);
     document.getElementById('wwai-cancel-btn').addEventListener('click', () =>
         WWAnalyzer.cancelBatch()
@@ -112,11 +124,9 @@ function _togglePanel() { _panel.classList.contains('wwai-open') ? _closePanel()
 function _handleModeClick(mode) {
     if (!_currentJobId) return;
     _clearResult();
-    if (mode === 'BEST_FIT') {
-        _handleFitScore();
-    } else {
-        _handlePrecomputed(mode);
-    }
+    if      (mode === 'BEST_FIT')      _handleFitScore();
+    else if (mode === 'SHOULD_APPLY')  _handleShouldIApply();
+    else                               _handlePrecomputed(mode);
 }
 
 // ── Job change detection (MutationObserver) ────────────────────────────────────
@@ -153,8 +163,13 @@ new MutationObserver((mutations) => {
 }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
 
 function _onJobOpen(detail) {
-    document.getElementById('wwai-job-title').textContent    = detail.title;
-    document.getElementById('wwai-job-employer').textContent = detail.employer;
+    document.getElementById('wwai-job-title').textContent = detail.title;
+    const row = WWScaper.scrapeRowByJobId(detail.jobId) ?? {};
+    const deadline = row.appDeadline || detail.appDeadline || '';
+    document.getElementById('wwai-job-meta').textContent =
+        [detail.employer, deadline ? `Deadline: ${deadline}` : ''].filter(Boolean).join(' · ');
+    _hide('wwai-sniff-flag');
+    _hide('wwai-role-preview');
 
     _show('wwai-job-info'); _show('wwai-actions');
     _show('wwai-ask-divider'); _show('wwai-ask');
@@ -190,6 +205,13 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
     _wireEvents(_panel);
 
     if (sessionStorage.getItem('wwai_panel_open') === '1') _openPanel();
+
+    // Show resume status
+    WWStorage.getResume().then(r => {
+        const el = document.getElementById('wwai-resume-status');
+        el.textContent = r ? '✅ Resume uploaded' : '⚠️ No resume — upload in Settings';
+        el.className = 'wwai-resume-status ' + (r ? 'wwai-resume-status--ok' : 'wwai-resume-status--warn');
+    });
 
     // Kick off initial status + table sync after DOM settles
     _refreshStatus();

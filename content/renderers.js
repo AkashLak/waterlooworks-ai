@@ -48,6 +48,7 @@ function _renderResult(mode, data) {
     card.className = 'wwai-result';
 
     if (mode === 'BEST_FIT')            _fillBestFit(card, data);
+    else if (mode === 'SHOULD_APPLY')   _fillShouldIApply(card, data);
     else if (mode === 'DREAM_JOB')      _fillDreamJob(card, data);
     else if (mode === 'QA_SNIFF')       _fillQaSniff(card, data);
     else if (mode === 'SEARCH_RESULTS') _fillSearchResults(card, data);
@@ -115,6 +116,32 @@ function _fillSearchResults(card, jobs) {
         if (metaParts.length) _el(item, 'div', 'wwai-search-result__meta', metaParts.join(' · '));
         if (job.reason) _el(item, 'div', 'wwai-search-result__reason', job.reason);
     }
+}
+
+function _fillShouldIApply(card, { fit, dream, qa }) {
+    const score      = fit?.fitScore ?? 0;
+    const suspicious = qa  ? (qa.isDisguised  ?? (qa.titleMatchesRole === false) ?? false) : false;
+    const isDream    = dream?.isDreamJob ?? false;
+
+    let rec, tier;
+    if      (score >= 7 && !suspicious) { rec = '✅ Yes — Apply';               tier = 'great'; }
+    else if (score >= 5 || isDream)     { rec = '🤔 Maybe — Worth Considering';  tier = 'decent'; }
+    else                                { rec = '❌ Likely Not a Match';          tier = 'poor'; }
+
+    _label(card, 'Should I Apply?');
+    const v = _el(card, 'div', 'wwai-score', rec);
+    v.style.fontSize = '16px';
+    const bar  = _el(card, 'div', 'wwai-score__bar');
+    const fill = _el(bar,  'div', `wwai-score__fill wwai-score__fill--${tier}`);
+    fill.style.width = `${score * 10}%`;
+    if (fit?.verdict) _el(card, 'p', 'wwai-verdict', `Fit ${score}/10 — ${fit.verdict}`);
+    if (suspicious)   _el(card, 'p', 'wwai-verdict', '⚠️ The job title may not fully match the actual role.');
+    if (isDream && dream?.highlightInApplication) {
+        _label(card, 'What to highlight');
+        _tagList(card, [dream.highlightInApplication], 'warn');
+    }
+    if (fit?.strengths?.length) { _label(card, 'Your Strengths');  _tagList(card, fit.strengths, 'green'); }
+    if (fit?.gaps?.length)      { _label(card, 'Gaps to Address'); _tagList(card, fit.gaps, 'red'); }
 }
 
 // ── Error renderer ─────────────────────────────────────────────────────────────

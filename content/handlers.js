@@ -163,13 +163,31 @@ function _scheduleTableSync() {
 
 function _renderAnalysesReady() {
     _clearLoading();
+
+    // Passive sniff warning — show in header if QA analysis flagged this job
+    const qa = _currentAnalyses?.qa_disguise;
+    if (qa && (qa.isDisguised ?? (qa.titleMatchesRole === false))) {
+        _show('wwai-sniff-flag');
+    }
+
+    // Auto-show first sentence of role explainer as a quick preview
+    const roleText = _currentAnalyses?.role_explainer;
+    if (typeof roleText === 'string' && roleText.trim()) {
+        const sentence = roleText.split(/\.\s/)[0].trim();
+        if (sentence) {
+            const preview = document.getElementById('wwai-role-preview');
+            preview.textContent = sentence + '.';
+            _show('wwai-role-preview');
+        }
+    }
+
     const container = document.getElementById('wwai-result');
     container.innerHTML = '';
     container.classList.remove('wwai-hidden');
     const card = document.createElement('div');
     card.className = 'wwai-result';
     const p = document.createElement('p');
-    p.textContent = 'Analysis complete — click ⭐ Dream Job?, 🔍 Sniff Test, or 💼 Explain Role to view results.';
+    p.textContent = 'Analysis ready — click ✅ Should I Apply?, ⭐ Dream Job?, or 💼 Explain Role to view results.';
     card.appendChild(p);
     container.appendChild(card);
 }
@@ -238,7 +256,34 @@ async function _handleAsk(question) {
 
 // ── Smart Suggestions ──────────────────────────────────────────────────────────
 
-const SEARCH_LABELS = { top_fits: 'Top 5 Fits', closing_soon: 'Closing Soon', dream_jobs: 'Dream Jobs', qa_disguised: 'QA in Disguise', remote_hybrid: 'Remote & Hybrid' };
+const SEARCH_LABELS = { top_fits: 'Top 5 Fits', closing_soon: 'Closing Soon' };
+
+async function _handleShouldIApply() {
+    if (!_currentJobId) return;
+    _setLoading('Evaluating…'); _clearResult();
+    try {
+        const cached = _getCached(_currentJobId, 'BEST_FIT');
+        const fit = cached ?? await (async () => {
+            const r = await WWAnalyzer.getFitScore(_currentJobId);
+            _setCached(_currentJobId, 'BEST_FIT', r);
+            return r;
+        })();
+        const dream = _currentAnalyses?.dream_job ?? null;
+        const qa    = _currentAnalyses?.qa_disguise ?? null;
+        _renderResult('SHOULD_APPLY', { fit, dream, qa });
+    } catch (err) { _renderError(err); }
+    finally { _clearLoading(); }
+}
+
+async function _handleFreeSearch(query) {
+    _setLoading(`Searching "${query}"…`); _clearResult();
+    try {
+        const result = await WWAnalyzer.searchJobs({ type: 'free_search', query, limit: 10 });
+        const jobs = result.jobs ?? (Array.isArray(result) ? result : []);
+        _renderResult('SEARCH_RESULTS', jobs);
+    } catch (err) { _renderError(err); }
+    finally { _clearLoading(); }
+}
 
 async function _handleSearch(searchType) {
     _setLoading(`Searching ${SEARCH_LABELS[searchType] ?? searchType}…`);
@@ -332,8 +377,8 @@ async function _handleBatch() {
     _batchRunning = false;
     _hide('wwai-batch-progress');
     const parts = [`🟢 ${stats.great} great fits`, `🟡 ${stats.decent} decent matches`, `🔴 ${stats.poor} poor fits`];
-    if (stats.disguised) parts.push(`⚠️ ${stats.disguised} QA in disguise`);
-    if (unseenCount) parts.push(`${unseenCount} not yet analyzed — click to add`);
+    if (stats.disguised) parts.push(`⚠️ ${stats.disguised} title mismatches`);
+    if (unseenCount) parts.push(`${unseenCount} need descriptions — open each title once to enable scoring`);
     if (WWAnalyzer.isBatchCancelled()) parts.push('(cancelled)');
     const summaryEl = document.getElementById('wwai-batch-summary');
     summaryEl.textContent = parts.join(' · ');
