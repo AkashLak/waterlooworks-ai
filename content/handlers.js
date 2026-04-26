@@ -168,6 +168,15 @@ function _renderAnalysesReady() {
     const qa = _currentAnalyses?.qa_disguise;
     if (qa && (qa.isDisguised ?? (qa.titleMatchesRole === false))) {
         _show('wwai-sniff-flag');
+        // Pre-populate the expandable detail card
+        const detailEl = document.getElementById('wwai-sniff-detail');
+        if (detailEl) {
+            detailEl.innerHTML = '';
+            const card = document.createElement('div');
+            card.className = 'wwai-result';
+            _fillQaSniff(card, qa);
+            detailEl.appendChild(card);
+        }
     }
 
     // Auto-show first sentence of role explainer as a quick preview

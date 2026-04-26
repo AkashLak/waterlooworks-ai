@@ -30,7 +30,8 @@ function _buildPanel() {
             <div class="wwai-job-info wwai-hidden" id="wwai-job-info">
                 <div class="wwai-job-info__title"   id="wwai-job-title"></div>
                 <div class="wwai-job-info__meta"    id="wwai-job-meta"></div>
-                <div class="wwai-job-info__sniff wwai-hidden" id="wwai-sniff-flag">⚠️ Title may not match this role</div>
+                <div class="wwai-job-info__sniff wwai-hidden" id="wwai-sniff-flag">⚠️ Title may not match this role ▾</div>
+                <div class="wwai-sniff-detail wwai-hidden" id="wwai-sniff-detail"></div>
                 <div class="wwai-job-info__preview wwai-hidden" id="wwai-role-preview"></div>
             </div>
             <div class="wwai-actions wwai-hidden" id="wwai-actions">
@@ -101,6 +102,19 @@ function _wireEvents(panel) {
     document.getElementById('wwai-ask-btn').addEventListener('click', submit);
     askInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
 
+    document.getElementById('wwai-sniff-flag').addEventListener('click', () => {
+        const detail = document.getElementById('wwai-sniff-detail');
+        const flag   = document.getElementById('wwai-sniff-flag');
+        const open   = !detail.classList.contains('wwai-hidden');
+        if (open) {
+            _hide('wwai-sniff-detail');
+            flag.textContent = '⚠️ Title may not match this role ▾';
+        } else {
+            _show('wwai-sniff-detail');
+            flag.textContent = '⚠️ Title may not match this role ▴';
+        }
+    });
+
     const searchInput = document.getElementById('wwai-search-input');
     const searchGo = () => { const q = searchInput.value.trim(); if (q) _handleFreeSearch(q); };
     document.getElementById('wwai-search-btn').addEventListener('click', searchGo);
@@ -170,6 +184,9 @@ function _onJobOpen(detail) {
     document.getElementById('wwai-job-meta').textContent =
         [detail.employer, deadline ? `Deadline: ${deadline}` : ''].filter(Boolean).join(' · ');
     _hide('wwai-sniff-flag');
+    _hide('wwai-sniff-detail');
+    document.getElementById('wwai-sniff-detail').innerHTML = '';
+    document.getElementById('wwai-sniff-flag').textContent = '⚠️ Title may not match this role ▾';
     _hide('wwai-role-preview');
 
     // Skip submit if this job was already submitted in this session (modal class flicker guard)
