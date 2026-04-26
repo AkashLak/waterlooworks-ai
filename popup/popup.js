@@ -10,25 +10,29 @@ const btnSettings = document.getElementById('btn-settings');
 btnSettings.addEventListener('click', () => chrome.runtime.openOptionsPage());
 
 (async function init() {
-    const [tab, { resume, jobsAnalyzed }] = await Promise.all([
+    const [tab, storage] = await Promise.all([
         _getActiveTab(),
         WWStorage.getAll(),
     ]);
 
     // Resume status
-    if (resume) {
-        _setIcon(iconResume, true);
-    } else {
-        _setIcon(iconResume, false);
-    }
+    _setIcon(iconResume, !!storage.resume);
 
     // WaterlooWorks status
     const onWW = tab?.url?.includes('waterlooworks.uwaterloo.ca') ?? false;
     _setIcon(iconWw, onWW);
     if (!onWW) nudge.classList.remove('hidden');
 
-    // Session stats
-    jobsCount.textContent = jobsAnalyzed ?? 0;
+    // Live job count from backend
+    jobsCount.textContent = '…';
+    chrome.runtime.sendMessage({ action: 'getStatus' }, (response) => {
+        if (response?.success) {
+            const count = response.data?.totalJobs ?? response.data?.jobCount ?? 0;
+            jobsCount.textContent = count;
+        } else {
+            jobsCount.textContent = '—';
+        }
+    });
 })();
 
 function _getActiveTab() {
