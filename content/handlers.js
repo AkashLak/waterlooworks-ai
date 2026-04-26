@@ -128,7 +128,11 @@ function _showRetryPolling(jobId) {
     btn.addEventListener('click', () => {
         container.innerHTML = '';
         container.classList.add('wwai-hidden');
-        _startPolling(jobId);
+        if (_currentDetail) {
+            _submitAndPoll(_currentDetail);
+        } else {
+            _startPolling(jobId);
+        }
     });
     card.appendChild(p); card.appendChild(btn); container.appendChild(card);
 }
