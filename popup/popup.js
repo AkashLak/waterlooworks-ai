@@ -23,16 +23,7 @@ btnSettings.addEventListener('click', () => chrome.runtime.openOptionsPage());
     _setIcon(iconWw, onWW);
     if (!onWW) nudge.classList.remove('hidden');
 
-    // Live job count from backend
-    jobsCount.textContent = '…';
-    chrome.runtime.sendMessage({ action: 'getStatus' }, (response) => {
-        if (response?.success) {
-            const count = response.data?.totalJobs ?? response.data?.jobCount ?? 0;
-            jobsCount.textContent = count;
-        } else {
-            jobsCount.textContent = '—';
-        }
-    });
+    jobsCount.textContent = storage.jobsAnalyzed ?? 0;
 })();
 
 function _getActiveTab() {

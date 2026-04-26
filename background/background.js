@@ -43,7 +43,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     switch (message.action) {
         case 'submitJob':
-            return respond(WWApi.submitJob(message.jobData));
+            return respond(_handleSubmitJob(message.jobData));
 
         case 'getJobAnalyses':
             return respond(WWApi.getJobAnalyses(message.jobId));
@@ -74,6 +74,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             _log('Received unknown action:', message.action);
     }
 });
+
+// ── Handlers ───────────────────────────────────────────────────────────────────
+
+async function _handleSubmitJob(jobData) {
+    if (jobData?.jobId) await WWStorage.recordAnalyzedJob(jobData.jobId);
+    return WWApi.submitJob(jobData);
+}
 
 // ── Handlers that require resume from storage ──────────────────────────────────
 // Resume is always read here in the background and never accepted from the
