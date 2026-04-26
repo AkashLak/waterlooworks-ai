@@ -83,12 +83,13 @@ function _fillDreamJob(card, d) {
 
 function _fillQaSniff(card, d) {
     _label(card, 'Role Check');
-    const matches = d.titleMatchesRole ?? true;
+    // Backend uses isDisguised; fall back to !titleMatchesRole for compatibility
+    const disguised = d.isDisguised ?? (d.titleMatchesRole === false);
     const v = _el(card, 'div', 'wwai-score',
-        matches ? '✓ Title matches the role' : `⚠️ ${d.actualRole ?? 'Title is misleading'}`
+        disguised ? `⚠️ ${d.actualRole ?? 'Title may be misleading'}` : '✓ Title matches the role'
     );
     v.style.fontSize = '15px';
-    v.style.color = matches ? '#22c55e' : '#ef4444';
+    v.style.color = disguised ? '#ef4444' : '#22c55e';
     if (d.summary) _el(card, 'p', 'wwai-verdict', d.summary);
     if (d.redFlags?.length)       { _label(card, 'Red Flags');           _tagList(card, d.redFlags, 'red'); }
     if (d.alsoGoodFitFor?.length) { _label(card, 'Also a good fit for'); _tagList(card, d.alsoGoodFitFor, 'warn'); }
@@ -161,7 +162,8 @@ function _injectPrecomputedBadges(rows, jobsMap) {
         const job = jobsMap[row.jobId];
         if (!job) continue;
         const score = job.fitScore ?? null;
-        const isQa  = job.qaResult ? !job.qaResult.titleMatchesRole : false;
+        const qa = job.qa_disguise || job.qaResult;
+        const isQa = qa ? (qa.isDisguised ?? !qa.titleMatchesRole ?? false) : false;
         _injectBadge(row, score, isQa);
     }
 }

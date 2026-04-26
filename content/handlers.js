@@ -70,6 +70,7 @@ async function _submitAndPoll(detail) {
 
     if (submitResult.analysesReady && submitResult.analyses) {
         _currentAnalyses = submitResult.analyses;
+        _renderAnalysesReady();
     } else {
         _setLoading('Analyzing new job…');
         _startPolling(detail.jobId);
@@ -89,6 +90,7 @@ function _schedulePoll(jobId) {
 async function _pollTick(jobId) {
     if (jobId !== _currentJobId) return;
     if (_pollCount >= MAX_POLLS) {
+        _clearPolling();
         _clearLoading();
         _showRetryPolling(jobId);
         return;
@@ -125,9 +127,17 @@ function _showRetryPolling(jobId) {
     btn.className = 'wwai-btn wwai-btn--full';
     btn.style.marginTop = '8px';
     btn.textContent = 'Retry';
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
         container.innerHTML = '';
         container.classList.add('wwai-hidden');
+        try {
+            const check = await WWAnalyzer.getJobAnalyses(jobId);
+            if (check.analysesReady && check.analyses) {
+                _currentAnalyses = check.analyses;
+                _renderAnalysesReady();
+                return;
+            }
+        } catch (_) {}
         if (_currentDetail) {
             _submitAndPoll(_currentDetail);
         } else {
@@ -145,6 +155,18 @@ function _scheduleTableSync() {
     if (_tableSyncScheduled) return;
     _tableSyncScheduled = true;
     setTimeout(_onTableChange, 1_500);
+}
+
+function _renderAnalysesReady() {
+    const container = document.getElementById('wwai-result');
+    container.innerHTML = '';
+    container.classList.remove('wwai-hidden');
+    const card = document.createElement('div');
+    card.className = 'wwai-result';
+    const p = document.createElement('p');
+    p.textContent = 'Analysis complete — click ⭐ Dream Job?, 🔍 Sniff Test, or 💼 Explain Role to view results.';
+    card.appendChild(p);
+    container.appendChild(card);
 }
 
 async function _onTableChange() {
@@ -181,7 +203,7 @@ async function _handlePrecomputed(mode) {
     if (!_currentJobId) return;
     const cached = _getCached(_currentJobId, mode);
     if (cached) { _renderResult(mode, cached); return; }
-    const KEY_MAP = { DREAM_JOB: 'dreamJob', QA_SNIFF: 'qaSniff', ROLE_EXPLAINER: 'roleExplainer' };
+    const KEY_MAP = { DREAM_JOB: 'dream_job', QA_SNIFF: 'qa_disguise', ROLE_EXPLAINER: 'role_explainer' };
     const key = KEY_MAP[mode];
     const data = key && _currentAnalyses ? _currentAnalyses[key] : null;
     if (data) { _setCached(_currentJobId, mode, data); _renderResult(mode, data); }
@@ -278,7 +300,8 @@ async function _handleBatch() {
 
         if (!jobRec) { unseenCount++; _injectBadge(row, null, false); continue; }
 
-        const isQa = jobRec.qaResult ? !jobRec.qaResult.titleMatchesRole : false;
+        const qa = jobRec.qa_disguise || jobRec.qaResult;
+        const isQa = qa ? (qa.isDisguised ?? !qa.titleMatchesRole ?? false) : false;
         if (isQa) stats.disguised++;
 
         if (jobRec.fitScore != null) {
