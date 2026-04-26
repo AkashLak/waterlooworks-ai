@@ -186,7 +186,7 @@ async function _onTableChange() {
         for (const job of jobs) { if (job.jobId) jobsMap[job.jobId] = job; }
         _injectPrecomputedBadges(rows, jobsMap);
         _refreshStatus();
-    } catch (_) {}
+    } catch (e) { console.error('[WWAI] table sync failed:', e); }
 }
 
 // ── Single-job analysis handlers ───────────────────────────────────────────────
