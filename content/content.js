@@ -206,11 +206,17 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
 
     if (sessionStorage.getItem('wwai_panel_open') === '1') _openPanel();
 
-    // Show resume status
-    WWStorage.getResume().then(r => {
+    // Show resume status and keep it in sync if the user updates their resume in Settings
+    function _updateResumeStatus(hasResume) {
         const el = document.getElementById('wwai-resume-status');
-        el.textContent = r ? '✅ Resume uploaded' : '⚠️ No resume — upload in Settings';
-        el.className = 'wwai-resume-status ' + (r ? 'wwai-resume-status--ok' : 'wwai-resume-status--warn');
+        el.textContent = hasResume ? '✅ Resume uploaded' : '⚠️ No resume — upload in Settings';
+        el.className = 'wwai-resume-status ' + (hasResume ? 'wwai-resume-status--ok' : 'wwai-resume-status--warn');
+    }
+    WWStorage.getResume().then(r => _updateResumeStatus(!!r));
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && 'ww_resume' in changes) {
+            _updateResumeStatus(!!changes.ww_resume.newValue);
+        }
     });
 
     // Kick off initial status + table sync after DOM settles
