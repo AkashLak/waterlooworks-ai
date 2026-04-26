@@ -199,6 +199,8 @@ function _onJobOpen(detail) {
     if (!alreadySubmitted) {
         _lastSubmittedJobId = detail.jobId;
         _submitAndPoll(detail);
+    } else {
+        _restoreAnalyses(detail.jobId);
     }
 }
 

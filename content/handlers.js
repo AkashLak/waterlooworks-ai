@@ -223,6 +223,16 @@ async function _onTableChange() {
 
 // ── Single-job analysis handlers ───────────────────────────────────────────────
 
+async function _restoreAnalyses(jobId) {
+    try {
+        const result = await WWAnalyzer.getJobAnalyses(jobId);
+        if (result.analysesReady && result.analyses) {
+            _currentAnalyses = result.analyses;
+            _renderAnalysesReady();
+        }
+    } catch (_) {}
+}
+
 async function _handleFitScore() {
     if (!_currentJobId) return;
     const cached = _getCached(_currentJobId, 'BEST_FIT');
