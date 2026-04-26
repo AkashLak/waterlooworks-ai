@@ -171,16 +171,20 @@ function _renderAnalysesReady() {
 
 async function _onTableChange() {
     _tableSyncScheduled = false;
-    const jobIds = WWScaper.getVisibleJobIds();
-    if (!jobIds.length) return;
+    const rows = WWScaper.scrapeAllListingRows();
+    if (!rows.length) return;
+
+    // Strip titleEl (DOM node) before sending — it's only needed for batch click()
+    const rowData = rows.map(({ titleEl, ...rest }) => rest).filter(r => r.jobId);
+    if (!rowData.length) return;
 
     try {
-        await WWAnalyzer.syncActiveJobs(jobIds);
+        await WWAnalyzer.syncActiveJobs(rowData);
         const response = await WWAnalyzer.getAllJobs();
         const jobs     = response.jobs ?? (Array.isArray(response) ? response : []);
         const jobsMap  = {};
         for (const job of jobs) { if (job.jobId) jobsMap[job.jobId] = job; }
-        _injectPrecomputedBadges(WWScaper.scrapeAllListingRows(), jobsMap);
+        _injectPrecomputedBadges(rows, jobsMap);
         _refreshStatus();
     } catch (_) {}
 }

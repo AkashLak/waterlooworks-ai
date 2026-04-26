@@ -55,7 +55,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return respond(_handleGetFitScore(message.jobId));
 
         case 'syncActiveJobs':
-            return respond(WWApi.syncActiveJobs(message.jobIds));
+            return respond(WWApi.syncActiveJobs(message.rows));
 
         case 'searchJobs':
             return respond(_handleSearchJobs(message.criteria));
