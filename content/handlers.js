@@ -2,8 +2,8 @@
 // Shares top-level scope with content.js — reads _currentJobId, _currentAnalyses,
 // _batchRunning, _getCached, _setCached, and all renderer functions.
 
-const POLL_INTERVAL_MS = 3_000;
-const MAX_POLLS        = 10;
+const POLL_INTERVAL_MS = 4_000;
+const MAX_POLLS        = 20;
 const BATCH_DELAY_MS   = 4_000;
 let _pollTimer = null;
 let _pollCount = 0;
