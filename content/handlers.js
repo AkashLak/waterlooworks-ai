@@ -104,7 +104,7 @@ async function _pollTick(jobId) {
         const result = await WWAnalyzer.getJobAnalyses(jobId);
         if (result.analysesReady && result.analyses) {
             _currentAnalyses = result.analyses;
-            _clearLoading();
+            _renderAnalysesReady();
         } else {
             _schedulePoll(jobId);
         }
