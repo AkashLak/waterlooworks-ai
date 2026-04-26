@@ -3,7 +3,7 @@
 // _batchRunning, _getCached, _setCached, and all renderer functions.
 
 const POLL_INTERVAL_MS = 4_000;
-const MAX_POLLS        = 20;
+const MAX_POLLS        = 30;
 const BATCH_DELAY_MS   = 4_000;
 let _pollTimer = null;
 let _pollCount = 0;
@@ -91,8 +91,12 @@ async function _pollTick(jobId) {
     if (jobId !== _currentJobId) return;
     if (_pollCount >= MAX_POLLS) {
         _clearPolling();
-        _clearLoading();
-        _showRetryPolling(jobId);
+        if (_currentDetail) {
+            _submitAndPoll(_currentDetail);
+        } else {
+            _clearLoading();
+            _showRetryPolling(jobId);
+        }
         return;
     }
     _pollCount++;
