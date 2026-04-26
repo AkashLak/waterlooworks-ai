@@ -103,10 +103,12 @@ function _fillText(card, data, labelText) {
     p.style.margin = '0';
 }
 
-function _fillSearchResults(card, jobs) {
+function _fillSearchResults(card, data) {
+    const jobs    = Array.isArray(data) ? data : (data?.jobs ?? []);
+    const message = data?.message ?? null;
     _label(card, `${jobs.length} Result${jobs.length !== 1 ? 's' : ''}`);
     if (!jobs.length) {
-        _el(card, 'p', 'wwai-verdict', 'No matching jobs found.');
+        _el(card, 'p', 'wwai-verdict', message ?? 'No matching jobs found.');
         return;
     }
     for (const job of jobs) {

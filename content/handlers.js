@@ -278,9 +278,9 @@ async function _handleShouldIApply() {
 async function _handleFreeSearch(query) {
     _setLoading(`Searching "${query}"…`); _clearResult();
     try {
-        const result = await WWAnalyzer.searchJobs({ type: 'free_search', query, limit: 10 });
-        const jobs = result.jobs ?? (Array.isArray(result) ? result : []);
-        _renderResult('SEARCH_RESULTS', jobs);
+        const result = await WWAnalyzer.searchJobs({ criteria: 'free_search', query, limit: 10 });
+        const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
+        _renderResult('SEARCH_RESULTS', { jobs, message: result.message });
     } catch (err) { _renderError(err); }
     finally { _clearLoading(); }
 }
@@ -289,10 +289,9 @@ async function _handleSearch(searchType) {
     _setLoading(`Searching ${SEARCH_LABELS[searchType] ?? searchType}…`);
     _clearResult();
     try {
-        const criteria = { type: searchType, limit: searchType === 'top_fits' ? 5 : 20 };
-        const result = await WWAnalyzer.searchJobs(criteria);
-        const jobs = result.jobs ?? (Array.isArray(result) ? result : []);
-        _renderResult('SEARCH_RESULTS', jobs);
+        const result = await WWAnalyzer.searchJobs({ criteria: searchType, limit: searchType === 'top_fits' ? 5 : 20 });
+        const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
+        _renderResult('SEARCH_RESULTS', { jobs, message: result.message });
     } catch (err) {
         _renderError(err);
     } finally {
