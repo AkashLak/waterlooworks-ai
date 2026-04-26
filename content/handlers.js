@@ -162,6 +162,7 @@ function _scheduleTableSync() {
 }
 
 function _renderAnalysesReady() {
+    _clearLoading();
     const container = document.getElementById('wwai-result');
     container.innerHTML = '';
     container.classList.remove('wwai-hidden');
