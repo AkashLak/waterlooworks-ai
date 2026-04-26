@@ -7,10 +7,11 @@
 // These top-level vars are accessible from handlers.js and renderers.js
 // because all content scripts share the same execution context.
 
-let _currentJobId    = null;
-let _currentDetail   = null;
-let _currentAnalyses = null; // pre-computed analyses from submitJob / polling
-let _batchRunning    = false;
+let _currentJobId      = null;
+let _currentDetail     = null;
+let _currentAnalyses   = null; // pre-computed analyses from submitJob / polling
+let _batchRunning      = false;
+let _lastSubmittedJobId = null; // dedup guard — prevents double-submit on modal class flicker
 
 // ── Panel HTML ─────────────────────────────────────────────────────────────────
 
@@ -171,11 +172,17 @@ function _onJobOpen(detail) {
     _hide('wwai-sniff-flag');
     _hide('wwai-role-preview');
 
+    // Skip submit if this job was already submitted in this session (modal class flicker guard)
+    const alreadySubmitted = _lastSubmittedJobId === detail.jobId;
+
     _show('wwai-job-info'); _show('wwai-actions');
     _show('wwai-ask-divider'); _show('wwai-ask');
     _hide('wwai-empty'); _clearLoading(); _clearResult();
 
-    _submitAndPoll(detail);
+    if (!alreadySubmitted) {
+        _lastSubmittedJobId = detail.jobId;
+        _submitAndPoll(detail);
+    }
 }
 
 function _onJobClose() {
