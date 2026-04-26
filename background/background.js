@@ -15,8 +15,19 @@ function _log(...args) {
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 
-chrome.runtime.onInstalled.addListener(({ reason }) => {
+// Bump this string whenever the job-tracking logic changes to force a one-time reset.
+const TRACKING_VERSION = '2';
+
+chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     _log('Extension lifecycle event, reason:', reason);
+    const stored = await new Promise(r =>
+        chrome.storage.local.get('ww_tracking_version', d => r(d.ww_tracking_version))
+    );
+    if (stored !== TRACKING_VERSION) {
+        await WWStorage.resetJobsAnalyzed();
+        chrome.storage.local.set({ ww_tracking_version: TRACKING_VERSION });
+        _log('Job tracking reset to version', TRACKING_VERSION);
+    }
 });
 
 // ── Message router ─────────────────────────────────────────────────────────────
