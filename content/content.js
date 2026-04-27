@@ -194,7 +194,8 @@ function _onJobOpen(detail) {
 
     _show('wwai-job-info'); _show('wwai-actions');
     _show('wwai-ask-divider'); _show('wwai-ask');
-    _hide('wwai-empty'); _clearLoading(); _clearResult();
+    _hide('wwai-empty'); _hide('wwai-batch-btn');
+    _hide('wwai-batch-summary'); _clearLoading(); _clearResult();
 
     if (!alreadySubmitted) {
         _lastSubmittedJobId = detail.jobId;
@@ -207,7 +208,7 @@ function _onJobOpen(detail) {
 function _onJobClose() {
     _hide('wwai-job-info'); _hide('wwai-actions');
     _hide('wwai-ask-divider'); _hide('wwai-ask');
-    _show('wwai-empty');
+    _show('wwai-empty'); _show('wwai-batch-btn');
     _clearResult(); _clearLoading();
 }
 
