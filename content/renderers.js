@@ -132,10 +132,14 @@ function _fillText(card, data, labelText) {
 function _fillSearchResults(card, data) {
     const jobs    = Array.isArray(data) ? data : (data?.jobs ?? []);
     const message = data?.message ?? null;
+    const type    = data?.type ?? null;
     _label(card, `${jobs.length} Result${jobs.length !== 1 ? 's' : ''}`);
     if (!jobs.length) {
         _el(card, 'p', 'wwai-verdict', message ?? 'No matching jobs found.');
         return;
+    }
+    if (type === 'top_fits' && jobs.length < 5) {
+        _el(card, 'p', 'wwai-verdict', `Showing ${jobs.length} of 5 — click more job titles and run 📋 Score All Jobs to fill out your Top 5.`);
     }
     for (const job of jobs) {
         const item = _el(card, 'div', 'wwai-search-result');
