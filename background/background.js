@@ -123,7 +123,7 @@ async function _handleSearchJobs(criteria) {
 }
 
 async function _handleAskQuestion(jobId, question) {
-    const resume = await _requireResume();
+    const resume = await WWStorage.getResume(); // optional — send if available, don't block if not
     _log('askQuestion | job:', jobId);
     return WWApi.askQuestion(jobId, question, resume);
 }
