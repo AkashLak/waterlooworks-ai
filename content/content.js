@@ -68,7 +68,7 @@ function _buildPanel() {
             </div>
             <div id="wwai-batch-summary" class="wwai-summary wwai-hidden"></div>
             <hr class="wwai-divider">
-            <div class="wwai-suggestions">
+            <div class="wwai-suggestions" id="wwai-suggestions">
                 <div class="wwai-suggestions__title">Smart Suggestions</div>
                 <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="closing_soon">⏰ Closing Soon</button>
                 <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="top_fits">🎯 Top 5 Fits for Me</button>
@@ -195,7 +195,8 @@ function _onJobOpen(detail) {
     _show('wwai-job-info'); _show('wwai-actions');
     _show('wwai-ask-divider'); _show('wwai-ask');
     _hide('wwai-empty'); _hide('wwai-batch-btn');
-    _hide('wwai-batch-summary'); _clearLoading(); _clearResult();
+    _hide('wwai-batch-summary'); _hide('wwai-suggestions');
+    _clearLoading(); _clearResult();
 
     if (!alreadySubmitted) {
         _lastSubmittedJobId = detail.jobId;
@@ -208,7 +209,7 @@ function _onJobOpen(detail) {
 function _onJobClose() {
     _hide('wwai-job-info'); _hide('wwai-actions');
     _hide('wwai-ask-divider'); _hide('wwai-ask');
-    _show('wwai-empty'); _show('wwai-batch-btn');
+    _show('wwai-empty'); _show('wwai-batch-btn'); _show('wwai-suggestions');
     _clearResult(); _clearLoading();
 }
 
