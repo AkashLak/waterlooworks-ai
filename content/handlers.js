@@ -247,14 +247,27 @@ async function _handleFitScore() {
 
 async function _handlePrecomputed(mode) {
     if (!_currentJobId) return;
+    if (mode === 'DREAM_JOB') { await _handleDreamFit(); return; }
     const cached = _getCached(_currentJobId, mode);
     if (cached) { _renderResult(mode, cached); return; }
-    const KEY_MAP = { DREAM_JOB: 'dream_job', QA_SNIFF: 'qa_disguise', ROLE_EXPLAINER: 'role_explainer' };
+    const KEY_MAP = { QA_SNIFF: 'qa_disguise', ROLE_EXPLAINER: 'role_explainer' };
     const key = KEY_MAP[mode];
     const data = key && _currentAnalyses ? _currentAnalyses[key] : null;
     if (data) { _setCached(_currentJobId, mode, data); _renderResult(mode, data); }
     else if (_pollTimer) _renderError({ message: 'Analysis in progress — please wait a moment and try again.' });
     else _renderError({ message: 'Analysis not yet available. Try reopening this job.' });
+}
+
+async function _handleDreamFit() {
+    const cached = _getCached(_currentJobId, 'DREAM_JOB');
+    if (cached) { _renderResult('DREAM_JOB', cached); return; }
+    _setLoading('Assessing dream fit…'); _clearResult();
+    try {
+        const result = await WWAnalyzer.getDreamFit(_currentJobId);
+        _setCached(_currentJobId, 'DREAM_JOB', result);
+        _renderResult('DREAM_JOB', result);
+    } catch (err) { _renderError(err); }
+    finally { _clearLoading(); }
 }
 
 async function _handleAsk(question) {

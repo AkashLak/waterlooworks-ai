@@ -71,12 +71,24 @@ function _fillBestFit(card, d) {
 }
 
 function _fillDreamJob(card, d) {
-    _label(card, 'Dream Job Analysis');
-    const v = _el(card, 'div', 'wwai-score', d.isDreamJob ? '⭐ Dream Job!' : 'Not a dream job');
-    v.style.fontSize = '18px';
-    v.style.color = d.isDreamJob ? '#1a1a1a' : '#888';
-    _el(card, 'p', 'wwai-verdict', d.reason ?? '');
-    if (d.isDreamJob && d.highlightInApplication) {
+    const isDream = d.isDream ?? d.isDreamJob ?? false;
+    const isStretch = d.isStretch ?? false;
+
+    let verdict, color;
+    if (isDream)        { verdict = '⭐ Yes — pursue this!';    color = '#16a34a'; }
+    else if (isStretch) { verdict = '🔭 Big stretch — try anyway'; color = '#b45309'; }
+    else                { verdict = '❌ Not the right fit for you'; color = '#888'; }
+
+    _label(card, 'Dream Job?');
+    const v = _el(card, 'div', 'wwai-score', verdict);
+    v.style.fontSize = '16px';
+    v.style.color = color;
+    if (d.reason) _el(card, 'p', 'wwai-verdict', d.reason);
+    if (d.attainabilityNote) {
+        _label(card, 'Attainability');
+        _el(card, 'p', 'wwai-verdict', d.attainabilityNote);
+    }
+    if (d.highlightInApplication) {
         _label(card, 'What to highlight');
         _tagList(card, [d.highlightInApplication], 'warn');
     }
@@ -123,7 +135,7 @@ function _fillSearchResults(card, data) {
 function _fillShouldIApply(card, { fit, dream, qa }) {
     const score      = fit?.fitScore ?? 0;
     const suspicious = qa  ? (qa.isDisguised  ?? (qa.titleMatchesRole === false) ?? false) : false;
-    const isDream    = dream?.isDreamJob ?? false;
+    const isDream    = dream?.isDream ?? dream?.isDreamJob ?? false;
 
     let rec, tier;
     if      (score >= 7 && !suspicious) { rec = '✅ Yes — Apply';               tier = 'great'; }

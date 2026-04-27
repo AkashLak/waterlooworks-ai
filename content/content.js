@@ -242,6 +242,10 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
     chrome.storage.onChanged.addListener((changes, area) => {
         if (area === 'local' && 'ww_resume' in changes) {
             _updateResumeStatus(!!changes.ww_resume.newValue);
+            // Invalidate resume-specific session caches
+            Object.keys(sessionStorage)
+                .filter(k => k.startsWith('wwai_') && (k.endsWith('_BEST_FIT') || k.endsWith('_DREAM_JOB')))
+                .forEach(k => sessionStorage.removeItem(k));
         }
     });
 

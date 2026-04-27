@@ -65,6 +65,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'getFitScore':
             return respond(_handleGetFitScore(message.jobId));
 
+        case 'getDreamFit':
+            return respond(_handleGetDreamFit(message.jobId));
+
         case 'syncActiveJobs':
             return respond(WWApi.syncActiveJobs(message.rows));
 
@@ -101,6 +104,12 @@ async function _handleGetFitScore(jobId) {
     const resume = await _requireResume();
     _log('getFitScore | job:', jobId);
     return WWApi.getFitScore(jobId, resume);
+}
+
+async function _handleGetDreamFit(jobId) {
+    const resume = await _requireResume();
+    _log('getDreamFit | job:', jobId);
+    return WWApi.getDreamFit(jobId, resume);
 }
 
 async function _handleSearchJobs(criteria) {
