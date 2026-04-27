@@ -323,13 +323,19 @@ async function _handleFreeSearch(query) {
     finally { _clearLoading(); }
 }
 
+const SEARCH_EMPTY_MESSAGES = {
+    closing_soon: 'No upcoming deadlines — your analyzed jobs may have all closed for this cycle.',
+    top_fits:     'Open some job postings first so their descriptions can be analyzed.',
+};
+
 async function _handleSearch(searchType) {
     _setLoading(`Searching ${SEARCH_LABELS[searchType] ?? searchType}…`);
     _clearResult();
     try {
         const result = await WWAnalyzer.searchJobs({ criteria: searchType, limit: searchType === 'top_fits' ? 5 : 20 });
         const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
-        _renderResult('SEARCH_RESULTS', { jobs, message: result.message });
+        const message = result.message ?? SEARCH_EMPTY_MESSAGES[searchType] ?? null;
+        _renderResult('SEARCH_RESULTS', { jobs, message });
     } catch (err) {
         _renderError(err);
     } finally {
