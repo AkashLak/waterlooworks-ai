@@ -280,7 +280,7 @@ async function _handleAsk(question) {
     try {
         const result = await WWAnalyzer.askQuestion(_currentJobId, question);
         const answer = typeof result === 'string' ? result : (result.answer ?? JSON.stringify(result));
-        _renderResult('ASK', answer);
+        _renderResult('ASK', { question, answer });
         document.getElementById('wwai-ask-input').value = '';
     } catch (err) {
         _renderError(err);

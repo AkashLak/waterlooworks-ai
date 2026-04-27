@@ -52,7 +52,8 @@ function _renderResult(mode, data) {
     else if (mode === 'DREAM_JOB')      _fillDreamJob(card, data);
     else if (mode === 'QA_SNIFF')       _fillQaSniff(card, data);
     else if (mode === 'SEARCH_RESULTS') _fillSearchResults(card, data);
-    else                                _fillText(card, data, mode === 'ROLE_EXPLAINER' ? 'Day-to-Day Breakdown' : 'Answer');
+    else if (mode === 'ASK')            _fillAsk(card, data);
+    else                                _fillText(card, data, 'Day-to-Day Breakdown');
 
     container.appendChild(card);
 }
@@ -106,6 +107,19 @@ function _fillQaSniff(card, d) {
     if (d.summary) _el(card, 'p', 'wwai-verdict', d.summary);
     if (d.redFlags?.length)       { _label(card, 'Red Flags');           _tagList(card, d.redFlags, 'red'); }
     if (d.alsoGoodFitFor?.length) { _label(card, 'Also a good fit for'); _tagList(card, d.alsoGoodFitFor, 'warn'); }
+}
+
+function _fillAsk(card, data) {
+    const question = typeof data === 'string' ? null : data.question;
+    const answer   = typeof data === 'string' ? data  : (data.answer ?? '');
+    if (question) {
+        _label(card, 'Your question');
+        _el(card, 'p', 'wwai-verdict', question);
+    }
+    _label(card, 'Answer');
+    const p = _el(card, 'p', '', answer);
+    p.style.whiteSpace = 'pre-wrap';
+    p.style.margin = '0';
 }
 
 function _fillText(card, data, labelText) {
