@@ -216,7 +216,10 @@ async function _onTableChange() {
         const response = await WWAnalyzer.getAllJobs();
         const jobs     = response.jobs ?? (Array.isArray(response) ? response : []);
         const jobsMap  = {};
-        for (const job of jobs) { if (job.jobId) jobsMap[job.jobId] = job; }
+        for (const job of jobs) {
+            const id = job.jobId ?? job.id;
+            if (id) jobsMap[id] = job;
+        }
         _injectPrecomputedBadges(rows, jobsMap);
         _refreshStatus();
     } catch (_) {}
@@ -373,7 +376,10 @@ async function _handleBatch() {
     try {
         const response = await WWAnalyzer.getAllJobs();
         const jobs = response.jobs ?? (Array.isArray(response) ? response : []);
-        for (const job of jobs) { if (job.jobId) allJobsMap[job.jobId] = job; }
+        for (const job of jobs) {
+            const id = job.jobId ?? job.id;
+            if (id) allJobsMap[id] = job;
+        }
     } catch (_) {}
 
     const rows = WWScaper.scrapeAllListingRows();
@@ -393,9 +399,10 @@ async function _handleBatch() {
         const isQa = qa ? (qa.isDisguised ?? !qa.titleMatchesRole ?? false) : false;
         if (isQa) stats.disguised++;
 
-        if (jobRec.fitScore != null) {
-            _injectBadge(row, jobRec.fitScore, isQa);
-            _tallyStat(stats, jobRec.fitScore);
+        const fitScore = jobRec.fitScore ?? jobRec.fit_score ?? null;
+        if (fitScore != null) {
+            _injectBadge(row, fitScore, isQa);
+            _tallyStat(stats, fitScore);
             scoredCount++;
         } else {
             txt.textContent = `Scoring job ${scoredCount + 1} of ${rows.length - unseenCount}…`;

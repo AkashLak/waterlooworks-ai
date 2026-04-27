@@ -216,7 +216,7 @@ function _injectPrecomputedBadges(rows, jobsMap) {
     for (const row of rows) {
         const job = jobsMap[row.jobId];
         if (!job) continue;
-        const score = job.fitScore ?? null;
+        const score = job.fitScore ?? job.fit_score ?? null;
         const qa = job.qa_disguise || job.qaResult;
         const isQa = qa ? (qa.isDisguised ?? !qa.titleMatchesRole ?? false) : false;
         _injectBadge(row, score, isQa);
