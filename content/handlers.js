@@ -227,13 +227,18 @@ async function _onTableChange() {
 // ── Single-job analysis handlers ───────────────────────────────────────────────
 
 async function _restoreAnalyses(jobId) {
+    _setLoading('Loading analyses…');
     try {
         const result = await WWAnalyzer.getJobAnalyses(jobId);
         if (result.analysesReady && result.analyses) {
             _currentAnalyses = result.analyses;
+            _clearLoading();
             _renderAnalysesReady();
+        } else {
+            // Analyses still computing — resume polling
+            _startPolling(jobId);
         }
-    } catch (_) {}
+    } catch (_) { _clearLoading(); }
 }
 
 async function _handleFitScore() {
@@ -419,6 +424,7 @@ async function _handleBatch() {
 
         const fitScore = jobRec.fitScore ?? jobRec.fit_score ?? null;
         if (fitScore != null) {
+            _setCached(row.jobId, 'BATCH_FIT', { fitScore });
             _injectBadge(row, fitScore, isQa);
             _tallyStat(stats, fitScore);
             scoredCount++;
@@ -427,6 +433,7 @@ async function _handleBatch() {
             const sessionCached = _getCached(row.jobId, 'BEST_FIT');
             if (sessionCached) {
                 const cachedScore = sessionCached.fitScore ?? sessionCached.fit_score;
+                _setCached(row.jobId, 'BATCH_FIT', sessionCached);
                 _injectBadge(row, cachedScore, isQa);
                 _tallyStat(stats, cachedScore);
                 scoredCount++;
@@ -436,6 +443,7 @@ async function _handleBatch() {
                     const fit = await WWAnalyzer.getFitScore(row.jobId);
                     const score = fit.fitScore ?? fit.fit_score;
                     _setCached(row.jobId, 'BEST_FIT', fit);
+                    _setCached(row.jobId, 'BATCH_FIT', fit);
                     _injectBadge(row, score, isQa);
                     _tallyStat(stats, score);
                     scoredCount++;
@@ -462,12 +470,13 @@ async function _handleBatch() {
         const toPrecompute = Object.entries(allJobsMap).filter(([id, job]) =>
             !visibleIds.has(id) &&
             !!(job.job_summary || job.job_responsibilities) &&
-            !_getCached(id, 'BEST_FIT')
+            !_getCached(id, 'BATCH_FIT')
         );
         for (const [id] of toPrecompute) {
             try {
                 const fit = await WWAnalyzer.getFitScore(id);
                 _setCached(id, 'BEST_FIT', fit);
+                _setCached(id, 'BATCH_FIT', fit);
             } catch (_) {}
         }
     }

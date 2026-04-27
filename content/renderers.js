@@ -219,9 +219,9 @@ function _injectBadge(row, score, isQa) {
 function _injectPrecomputedBadges(rows, jobsMap) {
     for (const row of rows) {
         const job = jobsMap[row.jobId];
-        // Session cache takes priority — don't overwrite a score the batch or Analyze Fit already computed
-        const sessionFit = _getCached(row.jobId, 'BEST_FIT');
-        const score = sessionFit?.fitScore ?? sessionFit?.fit_score
+        // Only show badges from Score All Jobs (BATCH_FIT) — individual Analyze Fit clicks don't populate badges
+        const batchFit = _getCached(row.jobId, 'BATCH_FIT');
+        const score = batchFit?.fitScore ?? batchFit?.fit_score
                    ?? (job ? (job.fitScore ?? job.fit_score ?? null) : null);
         if (score == null) continue; // no score yet — don't show ❓ passively
         const qa = job ? (job.qa_disguise || job.qaResult) : null;

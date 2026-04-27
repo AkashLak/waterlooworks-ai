@@ -245,7 +245,7 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
             _updateResumeStatus(!!changes.ww_resume.newValue);
             // Invalidate resume-specific session caches
             Object.keys(sessionStorage)
-                .filter(k => k.startsWith('wwai_') && (k.endsWith('_BEST_FIT') || k.endsWith('_DREAM_JOB')))
+                .filter(k => k.startsWith('wwai_') && (k.endsWith('_BEST_FIT') || k.endsWith('_DREAM_JOB') || k.endsWith('_BATCH_FIT')))
                 .forEach(k => sessionStorage.removeItem(k));
             // Clear any stale no-resume error from the result area
             _clearResult();
