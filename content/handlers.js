@@ -395,6 +395,10 @@ async function _handleBatch() {
 
         if (!jobRec) { unseenCount++; _injectBadge(row, null, false); continue; }
 
+        // Skip jobs with no description — scoring without content produces meaningless results
+        const hasDescription = !!(jobRec.job_summary || jobRec.job_responsibilities);
+        if (!hasDescription) { unseenCount++; _injectBadge(row, null, false); continue; }
+
         const qa = jobRec.qa_disguise || jobRec.qaResult;
         const isQa = qa ? (qa.isDisguised ?? !qa.titleMatchesRole ?? false) : false;
         if (isQa) stats.disguised++;
@@ -408,8 +412,8 @@ async function _handleBatch() {
             txt.textContent = `Scoring job ${scoredCount + 1} of ${rows.length - unseenCount}…`;
             try {
                 const fit = await WWAnalyzer.getFitScore(row.jobId);
-                _injectBadge(row, fit.fitScore, isQa);
-                _tallyStat(stats, fit.fitScore);
+                _injectBadge(row, fit.fitScore ?? fit.fit_score, isQa);
+                _tallyStat(stats, fit.fitScore ?? fit.fit_score);
                 scoredCount++;
                 await _sleep(BATCH_DELAY_MS);
             } catch (_) { _injectBadge(row, null, isQa); }
