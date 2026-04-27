@@ -215,9 +215,12 @@ function _injectBadge(row, score, isQa) {
 function _injectPrecomputedBadges(rows, jobsMap) {
     for (const row of rows) {
         const job = jobsMap[row.jobId];
-        if (!job) continue;
-        const score = job.fitScore ?? job.fit_score ?? null;
-        const qa = job.qa_disguise || job.qaResult;
+        // Session cache takes priority — don't overwrite a score the batch or Analyze Fit already computed
+        const sessionFit = _getCached(row.jobId, 'BEST_FIT');
+        const score = sessionFit?.fitScore ?? sessionFit?.fit_score
+                   ?? (job ? (job.fitScore ?? job.fit_score ?? null) : null);
+        if (!job && score == null) continue;
+        const qa = job ? (job.qa_disguise || job.qaResult) : null;
         const isQa = qa ? (qa.isDisguised ?? !qa.titleMatchesRole ?? false) : false;
         _injectBadge(row, score, isQa);
     }

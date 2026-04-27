@@ -156,7 +156,7 @@ function _showRetryPolling(jobId) {
 let _tableSyncScheduled = false;
 
 function _scheduleTableSync() {
-    if (_tableSyncScheduled) return;
+    if (_tableSyncScheduled || _batchRunning) return;
     _tableSyncScheduled = true;
     setTimeout(_onTableChange, 1_500);
 }
