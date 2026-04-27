@@ -4,7 +4,6 @@
 
 const POLL_INTERVAL_MS = 4_000;
 const MAX_POLLS        = 30;
-const BATCH_DELAY_MS   = 4_000;
 let _pollTimer = null;
 let _pollCount = 0;
 
@@ -417,14 +416,24 @@ async function _handleBatch() {
             _tallyStat(stats, fitScore);
             scoredCount++;
         } else {
-            txt.textContent = `Scoring job ${scoredCount + 1} of ${rows.length - unseenCount}…`;
-            try {
-                const fit = await WWAnalyzer.getFitScore(row.jobId);
-                _injectBadge(row, fit.fitScore ?? fit.fit_score, isQa);
-                _tallyStat(stats, fit.fitScore ?? fit.fit_score);
+            // Check session cache before making an API call
+            const sessionCached = _getCached(row.jobId, 'BEST_FIT');
+            if (sessionCached) {
+                const cachedScore = sessionCached.fitScore ?? sessionCached.fit_score;
+                _injectBadge(row, cachedScore, isQa);
+                _tallyStat(stats, cachedScore);
                 scoredCount++;
-                await _sleep(BATCH_DELAY_MS);
-            } catch (_) { _injectBadge(row, null, isQa); }
+            } else {
+                txt.textContent = `Scoring job ${scoredCount + 1} of ${rows.length - unseenCount}…`;
+                try {
+                    const fit = await WWAnalyzer.getFitScore(row.jobId);
+                    const score = fit.fitScore ?? fit.fit_score;
+                    _setCached(row.jobId, 'BEST_FIT', fit);
+                    _injectBadge(row, score, isQa);
+                    _tallyStat(stats, score);
+                    scoredCount++;
+                } catch (_) { _injectBadge(row, null, isQa); }
+            }
         }
     }
 
