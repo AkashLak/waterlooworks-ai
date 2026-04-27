@@ -219,7 +219,7 @@ function _injectPrecomputedBadges(rows, jobsMap) {
         const sessionFit = _getCached(row.jobId, 'BEST_FIT');
         const score = sessionFit?.fitScore ?? sessionFit?.fit_score
                    ?? (job ? (job.fitScore ?? job.fit_score ?? null) : null);
-        if (!job && score == null) continue;
+        if (score == null) continue; // no score yet — don't show ❓ passively
         const qa = job ? (job.qa_disguise || job.qaResult) : null;
         const isQa = qa ? (qa.isDisguised ?? !qa.titleMatchesRole ?? false) : false;
         _injectBadge(row, score, isQa);

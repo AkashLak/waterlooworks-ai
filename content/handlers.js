@@ -325,7 +325,7 @@ async function _handleFreeSearch(query) {
 
 const SEARCH_EMPTY_MESSAGES = {
     closing_soon: 'No upcoming deadlines — your analyzed jobs may have all closed for this cycle.',
-    top_fits:     'Open some job postings first so their descriptions can be analyzed.',
+    top_fits:     'No fit scores yet — click 📋 Score All Jobs to rank everything at once, or use 📊 Analyze Fit on individual jobs.',
 };
 
 async function _handleSearch(searchType) {
@@ -334,7 +334,8 @@ async function _handleSearch(searchType) {
     try {
         const result = await WWAnalyzer.searchJobs({ criteria: searchType, limit: searchType === 'top_fits' ? 5 : 20 });
         const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
-        const message = result.message ?? SEARCH_EMPTY_MESSAGES[searchType] ?? null;
+        // Use extension-defined empty messages for known types — they're more actionable than backend's generic messages
+        const message = SEARCH_EMPTY_MESSAGES[searchType] ?? result.message ?? null;
         _renderResult('SEARCH_RESULTS', { jobs, message });
     } catch (err) {
         _renderError(err);
@@ -452,6 +453,24 @@ async function _handleBatch() {
     const summaryEl = document.getElementById('wwai-batch-summary');
     summaryEl.textContent = parts.join(' · ');
     _show('wwai-batch-summary');
+
+    // Silently pre-compute fit scores for all other DB jobs with descriptions.
+    // When the user navigates to other pages, _injectPrecomputedBadges reads
+    // session cache and shows badges immediately without any extra work.
+    if (!WWAnalyzer.isBatchCancelled()) {
+        const visibleIds = new Set(rows.map(r => r.jobId));
+        const toPrecompute = Object.entries(allJobsMap).filter(([id, job]) =>
+            !visibleIds.has(id) &&
+            !!(job.job_summary || job.job_responsibilities) &&
+            !_getCached(id, 'BEST_FIT')
+        );
+        for (const [id] of toPrecompute) {
+            try {
+                const fit = await WWAnalyzer.getFitScore(id);
+                _setCached(id, 'BEST_FIT', fit);
+            } catch (_) {}
+        }
+    }
 }
 
 function _tallyStat(stats, score) {
