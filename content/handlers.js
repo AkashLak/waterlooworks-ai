@@ -235,6 +235,7 @@ async function _restoreAnalyses(jobId) {
 
 async function _handleFitScore() {
     if (!_currentJobId) return;
+    if (_pollTimer) { _renderError({ message: 'Analysis in progress — please wait a moment and try again.' }); return; }
     const cached = _getCached(_currentJobId, 'BEST_FIT');
     if (cached) { _renderResult('BEST_FIT', cached); return; }
     _setLoading('Analyzing fit…'); _clearResult();
@@ -259,6 +260,7 @@ async function _handlePrecomputed(mode) {
 }
 
 async function _handleDreamFit() {
+    if (_pollTimer) { _renderError({ message: 'Analysis in progress — please wait a moment and try again.' }); return; }
     const cached = _getCached(_currentJobId, 'DREAM_JOB');
     if (cached) { _renderResult('DREAM_JOB', cached); return; }
     _setLoading('Assessing dream fit…'); _clearResult();
@@ -292,6 +294,7 @@ const SEARCH_LABELS = { top_fits: 'Top 5 Fits', closing_soon: 'Closing Soon' };
 
 async function _handleShouldIApply() {
     if (!_currentJobId) return;
+    if (_pollTimer) { _renderError({ message: 'Analysis in progress — please wait a moment and try again.' }); return; }
     _setLoading('Evaluating…'); _clearResult();
     try {
         const cached = _getCached(_currentJobId, 'BEST_FIT');
