@@ -136,7 +136,6 @@ async function _handleSave() {
 // ── Clear ──────────────────────────────────────────────────────────────────────
 
 clearBtn.addEventListener('click', async () => {
-    if (!resumeTextEl.value.trim()) return;
     resumeTextEl.value = '';
     _updateCharCount();
     pdfStatusEl.textContent = '';
