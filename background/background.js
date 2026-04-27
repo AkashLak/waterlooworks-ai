@@ -81,6 +81,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'testConnection': // alias used by options page
             return respond(WWApi.getStatus());
 
+        case 'openOptions':
+            chrome.runtime.openOptionsPage();
+            return;
+
         case 'getStats': // dev.html compat
             return respond(WWStorage.getAll());
 
