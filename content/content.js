@@ -246,6 +246,8 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
             Object.keys(sessionStorage)
                 .filter(k => k.startsWith('wwai_') && (k.endsWith('_BEST_FIT') || k.endsWith('_DREAM_JOB')))
                 .forEach(k => sessionStorage.removeItem(k));
+            // Clear any stale no-resume error from the result area
+            _clearResult();
         }
     });
 
