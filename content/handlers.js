@@ -365,6 +365,14 @@ function _decodeHtml(str) {
 
 async function _handleBatch() {
     if (_batchRunning) return;
+
+    const resume = await WWStorage.getResume();
+    if (!resume) {
+        _renderError({ type: 'no_resume' });
+        _show('wwai-result');
+        return;
+    }
+
     _batchRunning = true;
     WWAnalyzer.resetBatchCancel();
 
