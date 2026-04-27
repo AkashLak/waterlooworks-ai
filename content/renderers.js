@@ -205,10 +205,10 @@ function _injectBadge(row, score, isQa) {
     badge.style.cssText = 'margin-left:5px; font-size:12px; cursor:default;';
     badge.textContent = score == null
         ? '❓'
-        : (score >= 8 ? '🟢' : score >= 5 ? '🟡' : '🔴') + (isQa ? ' ⚠️' : '');
+        : (score >= 8 ? '🟢' : score >= 5 ? '🟡' : '🔴') + ` ${score}` + (isQa ? ' ⚠️' : '');
     badge.title = score == null
         ? 'Not yet analyzed'
-        : `Fit: ${score}/10${isQa ? ' — may be QA role' : ''}`;
+        : `Fit: ${score}/10${isQa ? ' — title may not match role' : ''}`;
     titleEl.insertAdjacentElement('afterend', badge);
 }
 
