@@ -141,6 +141,9 @@ function _fillSearchResults(card, data) {
     if (type === 'top_fits' && jobs.length < 5) {
         _el(card, 'p', 'wwai-verdict', `Showing ${jobs.length} of 5 — click more job titles and run 📋 Score All Jobs to fill out your Top 5.`);
     }
+    if (type === 'free_search' && jobs.length >= 10) {
+        _el(card, 'p', 'wwai-verdict', 'Showing top 10 — refine your search to narrow down.');
+    }
     for (const job of jobs) {
         const item = _el(card, 'div', 'wwai-search-result');
         _el(item, 'div', 'wwai-search-result__title', job.title ?? job.jobId ?? '');

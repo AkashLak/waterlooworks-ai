@@ -12,6 +12,8 @@ let _currentDetail     = null;
 let _currentAnalyses   = null; // pre-computed analyses from submitJob / polling
 let _batchRunning      = false;
 let _lastSubmittedJobId = null; // dedup guard — prevents double-submit on modal class flicker
+let _lastSearchResult  = null; // last search data — restored when a job modal closes
+let _lastSearchQuery   = null; // free-text query — restores input field on job close
 
 // ── Panel HTML ─────────────────────────────────────────────────────────────────
 
@@ -209,8 +211,19 @@ function _onJobOpen(detail) {
 function _onJobClose() {
     _hide('wwai-job-info'); _hide('wwai-actions');
     _hide('wwai-ask-divider'); _hide('wwai-ask');
-    _show('wwai-empty'); _show('wwai-batch-btn'); _show('wwai-suggestions');
+    _show('wwai-batch-btn'); _show('wwai-suggestions');
     _clearResult(); _clearLoading();
+
+    if (_lastSearchResult) {
+        _hide('wwai-empty');
+        _renderResult('SEARCH_RESULTS', _lastSearchResult);
+        if (_lastSearchQuery) {
+            const input = document.getElementById('wwai-search-input');
+            if (input) input.value = _lastSearchQuery;
+        }
+    } else {
+        _show('wwai-empty');
+    }
 }
 
 // ── Session storage cache ──────────────────────────────────────────────────────

@@ -323,7 +323,10 @@ async function _handleFreeSearch(query) {
     try {
         const result = await WWAnalyzer.searchJobs({ criteria: 'free_search', query, limit: 10 });
         const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
-        _renderResult('SEARCH_RESULTS', { jobs, message: result.message, type: 'free_search' });
+        const data = { jobs, message: result.message, type: 'free_search' };
+        _lastSearchResult = data;
+        _lastSearchQuery  = query;
+        _renderResult('SEARCH_RESULTS', data);
     } catch (err) { _renderError(err); }
     finally { _clearLoading(); }
 }
@@ -339,9 +342,11 @@ async function _handleSearch(searchType) {
     try {
         const result = await WWAnalyzer.searchJobs({ criteria: searchType, limit: searchType === 'top_fits' ? 5 : 20 });
         const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
-        // Use extension-defined empty messages for known types — they're more actionable than backend's generic messages
         const message = SEARCH_EMPTY_MESSAGES[searchType] ?? result.message ?? null;
-        _renderResult('SEARCH_RESULTS', { jobs, message, type: searchType });
+        const data = { jobs, message, type: searchType };
+        _lastSearchResult = data;
+        _lastSearchQuery  = null; // predefined search — no query to restore to input
+        _renderResult('SEARCH_RESULTS', data);
     } catch (err) {
         _renderError(err);
     } finally {
