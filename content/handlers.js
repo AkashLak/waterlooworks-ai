@@ -646,10 +646,10 @@ async function _runDirectScrapePhase2() {
         return;
     }
 
-    const detailOrigin = _directDetailUrl
-        ? new URL(_directDetailUrl).origin
-        : 'https://waterlooworks.uwaterloo.ca';
-    const defaultDetailPath = '/myAccount/co-op/direct/jobs.htm';
+    // Resolve detail URL — _directDetailUrl may be a relative path
+    const detailBase = _directDetailUrl
+        ? new URL(_directDetailUrl, window.location.origin).href
+        : `${window.location.origin}/myAccount/co-op/direct/jobs.htm`;
 
     _updateStatusLine(`Loading ${rows.length} job descriptions…`);
 
@@ -660,7 +660,7 @@ async function _runDirectScrapePhase2() {
             rows.slice(i, i + _SCRAPE_CONCURRENCY).map(async (row) => {
                 if (!row.jobId) return;
                 try {
-                    const detailUrl = detailOrigin + (row.boardUrl ?? defaultDetailPath);
+                    const detailUrl = detailBase;
                     const body = `action=${encodeURIComponent(htmlToken)}&postingId=${encodeURIComponent(row.jobId)}`;
                     const res  = await _directFetch(detailUrl, {
                         method:  'POST',
@@ -709,10 +709,10 @@ async function _runDirectScrapePhase2() {
 async function _findHtmlDetailToken(sampleRow) {
     // Try each captured POST token on a single job; return the one that produces HTML with job fields.
     // The geo-data token returns JSON; the job-detail token returns HTML — we want the latter.
-    const detailOrigin = _directDetailUrl
-        ? new URL(_directDetailUrl).origin
-        : 'https://waterlooworks.uwaterloo.ca';
-    const detailUrl = detailOrigin + (sampleRow.boardUrl ?? '/myAccount/co-op/direct/jobs.htm');
+    // _directDetailUrl may be a relative path — resolve against page origin.
+    const detailUrl = _directDetailUrl
+        ? new URL(_directDetailUrl, window.location.origin).href
+        : `${window.location.origin}/myAccount/co-op/direct/jobs.htm`;
 
     for (const token of _directDetailTokens) {
         const body = `action=${encodeURIComponent(token)}&postingId=${encodeURIComponent(sampleRow.jobId)}`;
