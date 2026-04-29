@@ -280,6 +280,7 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
     function _onDetailToken(token, url) {
         if (!_directDetailTokens.includes(token)) _directDetailTokens.push(token);
         if (!_directDetailUrl && url) _directDetailUrl = url;
+        console.log('[WWAI] detail token captured — state:', _directScrapeState, 'tokens:', _directDetailTokens.length);
         if (_directScrapeState === 2) {
             _directScrapeState = 3;
             _runDirectScrapePhase2();

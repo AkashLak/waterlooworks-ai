@@ -635,6 +635,7 @@ async function _runDirectScrapePhase1() {
 
 async function _runDirectScrapePhase2() {
     const rows = _directScrapeRows;
+    console.log('[WWAI] Phase 2 started — rows:', rows?.length, 'tokens:', _directDetailTokens.length);
     if (!rows?.length || !_directDetailTokens.length) return;
 
     // Find which captured token returns job detail HTML (not the JSON geo-data token)
@@ -721,10 +722,13 @@ async function _findHtmlDetailToken(sampleRow) {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body,
         });
-        if (!res) continue;
+        if (!res) { console.log('[WWAI] detail fetch failed for token:', token.slice(0, 20)); continue; }
         const text = await res.text();
-        if (text.includes('tag__key-value-list')) return token;
+        const hasFields = text.includes('tag__key-value-list');
+        console.log('[WWAI] detail response — size:', text.length, 'hasFields:', hasFields, 'token:', token.slice(0, 20));
+        if (hasFields) return token;
     }
+    console.log('[WWAI] no HTML detail token found');
     return null;
 }
 
