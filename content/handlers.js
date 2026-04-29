@@ -163,7 +163,10 @@ function _scheduleTableSync() {
 
 function _renderAnalysesReady() {
     // Show sniff flag if QA analysis flagged this job — collapsed by default, expands on click
-    const qa = _currentAnalyses?.qa_disguise;
+    // Fall back to the allJobsMap snapshot if the analyses response didn't include qa_disguise
+    const qa = _currentAnalyses?.qa_disguise
+            ?? _allJobsMap[_currentJobId]?.qa_disguise
+            ?? null;
     if (qa && (qa.isMismatch ?? qa.isDisguised ?? (qa.titleMatchesRole === false))) {
         _show('wwai-sniff-flag');
         const detailEl = document.getElementById('wwai-sniff-detail');
@@ -230,6 +233,7 @@ async function _onTableChange() {
             const id = job.jobId ?? job.id;
             if (id) jobsMap[id] = job;
         }
+        _allJobsMap = jobsMap; // cache for sniff flag fallback in _renderAnalysesReady
         // Clear stale session cache for jobs the backend no longer has a record of.
         // Prevents old scores from a wiped DB from showing as badges.
         for (const row of rows) {
