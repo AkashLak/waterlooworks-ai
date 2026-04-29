@@ -162,11 +162,9 @@ function _scheduleTableSync() {
 }
 
 function _renderAnalysesReady() {
-    // Show sniff flag if QA analysis flagged this job — auto-expand so titles are immediately visible
+    // Show sniff flag if QA analysis flagged this job — collapsed by default, expands on click
     const qa = _currentAnalyses?.qa_disguise;
     if (qa && (qa.isMismatch ?? qa.isDisguised ?? (qa.titleMatchesRole === false))) {
-        const flag = document.getElementById('wwai-sniff-flag');
-        if (flag) flag.textContent = '💡 This role also fits other titles ▴';
         _show('wwai-sniff-flag');
         const detailEl = document.getElementById('wwai-sniff-detail');
         if (detailEl) {
@@ -175,7 +173,6 @@ function _renderAnalysesReady() {
             card.className = 'wwai-result';
             _fillQaSniff(card, qa);
             detailEl.appendChild(card);
-            _show('wwai-sniff-detail');
         }
     }
 
