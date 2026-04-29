@@ -1,4 +1,4 @@
-// Options page logic — resume save/load, PDF extraction, connection test.
+// Options page logic — resume save/load, PDF extraction, connection test, dream criteria.
 // WWStorage is available via ../lib/storage.js loaded before this script in options.html.
 
 const resumeTextEl = document.getElementById('resume-text');
@@ -155,3 +155,91 @@ function _setResumeCheck(done) {
     iconResume.textContent = done ? '✓' : '○';
     iconResume.classList.toggle('done', done);
 }
+
+// ── Dream job criteria ─────────────────────────────────────────────────────────
+
+const DEFAULT_CRITERIA = [
+    'Company Prestige',
+    'Technical Stack',
+    'Learning Opportunity',
+    'Real Ownership',
+    'Career Growth',
+    'Work-Life Balance',
+    'Impact',
+];
+
+let _currentCriteria = [...DEFAULT_CRITERIA];
+
+(async function initCriteria() {
+    const stored = await new Promise(r =>
+        chrome.storage.local.get('ww_dream_criteria', d => r(d.ww_dream_criteria))
+    );
+    _currentCriteria = Array.isArray(stored) && stored.length ? stored : [...DEFAULT_CRITERIA];
+    _renderCriteriaList(_currentCriteria);
+})();
+
+function _renderCriteriaList(criteria) {
+    const list = document.getElementById('criteria-list');
+    list.innerHTML = '';
+    criteria.forEach((item, i) => {
+        const li = document.createElement('li');
+        li.className = 'criteria-item';
+        li.draggable = true;
+        li.dataset.index = String(i);
+
+        const rank  = document.createElement('span');
+        rank.className = 'criteria-rank';
+        rank.textContent = i + 1;
+
+        const handle = document.createElement('span');
+        handle.className = 'criteria-drag';
+        handle.textContent = '⠿';
+
+        const label = document.createElement('span');
+        label.className = 'criteria-label';
+        label.textContent = item;
+
+        li.appendChild(rank);
+        li.appendChild(handle);
+        li.appendChild(label);
+
+        li.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('text/plain', String(i));
+            li.classList.add('dragging');
+        });
+        li.addEventListener('dragend', () => li.classList.remove('dragging'));
+        li.addEventListener('dragover', e => { e.preventDefault(); li.classList.add('drag-over'); });
+        li.addEventListener('dragleave', () => li.classList.remove('drag-over'));
+        li.addEventListener('drop', e => {
+            e.preventDefault();
+            li.classList.remove('drag-over');
+            const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+            const toIdx   = parseInt(li.dataset.index, 10);
+            if (fromIdx === toIdx) return;
+            const next = [..._currentCriteria];
+            const [moved] = next.splice(fromIdx, 1);
+            next.splice(toIdx, 0, moved);
+            _currentCriteria = next;
+            _saveCriteria(next);
+            _renderCriteriaList(next);
+        });
+
+        list.appendChild(li);
+    });
+}
+
+function _saveCriteria(criteria) {
+    chrome.storage.local.set({ ww_dream_criteria: criteria }, () => {
+        const msg = document.getElementById('criteria-status-msg');
+        msg.textContent = '✓ Priorities saved';
+        msg.className = 'status-msg success';
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 2000);
+    });
+}
+
+document.getElementById('reset-criteria-btn').addEventListener('click', () => {
+    _currentCriteria = [...DEFAULT_CRITERIA];
+    _saveCriteria(_currentCriteria);
+    _renderCriteriaList(_currentCriteria);
+});

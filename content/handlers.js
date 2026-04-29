@@ -162,13 +162,10 @@ function _scheduleTableSync() {
 }
 
 function _renderAnalysesReady() {
-    _clearLoading();
-
-    // Passive sniff warning — show in header if QA analysis flagged this job
+    // Show sniff flag if QA analysis flagged this job
     const qa = _currentAnalyses?.qa_disguise;
-    if (qa && (qa.isDisguised ?? (qa.titleMatchesRole === false))) {
+    if (qa && (qa.isMismatch ?? qa.isDisguised ?? (qa.titleMatchesRole === false))) {
         _show('wwai-sniff-flag');
-        // Pre-populate the expandable detail card
         const detailEl = document.getElementById('wwai-sniff-detail');
         if (detailEl) {
             detailEl.innerHTML = '';
@@ -179,26 +176,19 @@ function _renderAnalysesReady() {
         }
     }
 
-    // Auto-show first sentence of role explainer as a quick preview
-    const roleText = _currentAnalyses?.role_explainer;
-    if (typeof roleText === 'string' && roleText.trim()) {
-        const sentence = roleText.split(/\.\s/)[0].trim();
-        if (sentence) {
-            const preview = document.getElementById('wwai-role-preview');
-            preview.textContent = sentence + '.';
-            _show('wwai-role-preview');
-        }
+    // Auto-show first bullet of role explainer (structured JSON or plain text) as preview
+    const roleData = _currentAnalyses?.role_explainer;
+    const previewText = typeof roleData === 'string'
+        ? roleData.split(/\.\s/)[0].trim()
+        : (Array.isArray(roleData?.dayToDay) && roleData.dayToDay[0]) || '';
+    if (previewText) {
+        const preview = document.getElementById('wwai-role-preview');
+        preview.textContent = previewText.endsWith('.') ? previewText : previewText + '.';
+        _show('wwai-role-preview');
     }
 
-    const container = document.getElementById('wwai-result');
-    container.innerHTML = '';
-    container.classList.remove('wwai-hidden');
-    const card = document.createElement('div');
-    card.className = 'wwai-result';
-    const p = document.createElement('p');
-    p.textContent = 'Analysis ready — click ✅ Should I Apply?, ⭐ Dream Job?, or 💼 Explain Role to view results.';
-    card.appendChild(p);
-    container.appendChild(card);
+    // Auto-run Should I Apply so the user sees their result immediately
+    _handleShouldIApply();
 }
 
 async function _onTableChange() {
@@ -273,11 +263,18 @@ async function _handleDreamFit() {
     if (cached) { _renderResult('DREAM_JOB', cached); return; }
     _setLoading('Assessing dream fit…'); _clearResult();
     try {
-        const result = await WWAnalyzer.getDreamFit(_currentJobId);
+        const dreamCriteria = await _loadDreamCriteria();
+        const result = await WWAnalyzer.getDreamFit(_currentJobId, dreamCriteria);
         _setCached(_currentJobId, 'DREAM_JOB', result);
         _renderResult('DREAM_JOB', result);
     } catch (err) { _renderError(err); }
     finally { _clearLoading(); }
+}
+
+function _loadDreamCriteria() {
+    return new Promise(resolve =>
+        chrome.storage.local.get('ww_dream_criteria', d => resolve(d.ww_dream_criteria ?? null))
+    );
 }
 
 async function _handleAsk(question) {
@@ -319,6 +316,7 @@ async function _handleShouldIApply() {
 }
 
 async function _handleFreeSearch(query) {
+    _clearTableFilter();
     _setLoading(`Searching "${query}"…`); _clearResult();
     try {
         const result = await WWAnalyzer.searchJobs({ criteria: 'free_search', query, limit: 10 });
@@ -337,6 +335,7 @@ const SEARCH_EMPTY_MESSAGES = {
 };
 
 async function _handleSearch(searchType) {
+    _clearTableFilter();
     _setLoading(`Searching ${SEARCH_LABELS[searchType] ?? searchType}…`);
     _clearResult();
     try {
@@ -488,7 +487,96 @@ async function _handleBatch() {
 }
 
 function _tallyStat(stats, score) {
-    if (score >= 8) stats.great++;
-    else if (score >= 5) stats.decent++;
+    if (score >= 70) stats.great++;
+    else if (score >= 40) stats.decent++;
     else stats.poor++;
+}
+
+// ── DOM table filtering (similar roles) ────────────────────────────────────────
+
+function _filterTable(jobIds) {
+    const idSet = new Set(jobIds.map(String));
+    _activeFilter = idSet;
+    const allRows = WWScaper.scrapeAllListingRows();
+    let shown = 0, hidden = 0;
+    for (const row of allRows) {
+        const tr = row.titleEl?.closest('tr.table__row--body');
+        if (!tr) continue;
+        if (row.jobId && idSet.has(String(row.jobId))) {
+            tr.style.display = '';
+            shown++;
+        } else {
+            tr.style.display = 'none';
+            hidden++;
+        }
+    }
+    _filterMeta = { shown, total: jobIds.length, hidden };
+    return { shown, hidden };
+}
+
+function _clearTableFilter() {
+    _activeFilter = null;
+    _filterMeta   = null;
+    document.querySelectorAll('tr.table__row--body').forEach(tr => { tr.style.display = ''; });
+}
+
+function _renderFilterCard(shown, total, query) {
+    const container = document.getElementById('wwai-result');
+    container.innerHTML = '';
+    container.classList.remove('wwai-hidden');
+    const card = document.createElement('div');
+    card.className = 'wwai-result';
+    const msg = shown > 0
+        ? `Showing ${shown} match${shown !== 1 ? 'es' : ''} on this page for "${query}"${total > shown ? ` · ${total - shown} more in other pages` : ''}.`
+        : `No matches on this page for "${query}" — try navigating to other pages.`;
+    const p = document.createElement('p');
+    p.className = 'wwai-verdict';
+    p.textContent = msg;
+    const btn = document.createElement('button');
+    btn.className = 'wwai-btn wwai-btn--full';
+    btn.style.marginTop = '8px';
+    btn.textContent = 'Clear Filter';
+    btn.addEventListener('click', () => {
+        _clearTableFilter();
+        _lastSearchResult = null;
+        _clearResult();
+        _show('wwai-empty');
+    });
+    card.appendChild(p);
+    card.appendChild(btn);
+    container.appendChild(card);
+}
+
+async function _handleSimilarRoles(query) {
+    _clearTableFilter();
+    _setLoading(`Finding similar roles…`); _clearResult();
+    try {
+        const result = await WWAnalyzer.searchJobs({ criteria: 'similar_roles', query, limit: 20 });
+        const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
+        const jobIds = jobs.map(j => String(j.jobId ?? j.id)).filter(Boolean);
+        const { shown } = _filterTable(jobIds);
+        _renderFilterCard(shown, jobIds.length, query);
+        _lastSearchResult = { _filterCard: true, shown, total: jobIds.length, query };
+        _lastSearchQuery  = null;
+    } catch (err) { _renderError(err); }
+    finally { _clearLoading(); }
+}
+
+// ── Report ─────────────────────────────────────────────────────────────────────
+
+async function _handleReport() {
+    try {
+        await WWAnalyzer.createReport(
+            _lastRenderedMode ?? 'unknown',
+            null,
+            _lastRenderedData ?? null,
+            null,
+        );
+        const footer = document.querySelector('.wwai-footer');
+        if (footer) {
+            const btn = document.getElementById('wwai-report-btn');
+            if (btn) { btn.textContent = '✓ Reported!'; btn.disabled = true; }
+            setTimeout(() => { if (btn) { btn.textContent = '⚑ Report issue'; btn.disabled = false; } }, 3000);
+        }
+    } catch (_) {}
 }

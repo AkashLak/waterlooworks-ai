@@ -66,7 +66,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return respond(_handleGetFitScore(message.jobId));
 
         case 'getDreamFit':
-            return respond(_handleGetDreamFit(message.jobId));
+            return respond(_handleGetDreamFit(message.jobId, message.dreamCriteria));
+
+        case 'createReport':
+            return respond(WWApi.createReport(message.feature, message.input, message.output, message.note));
 
         case 'syncActiveJobs':
             return respond(WWApi.syncActiveJobs(message.rows));
@@ -110,15 +113,20 @@ async function _handleGetFitScore(jobId) {
     return WWApi.getFitScore(jobId, resume);
 }
 
-async function _handleGetDreamFit(jobId) {
+async function _handleGetDreamFit(jobId, dreamCriteria) {
     const resume = await _requireResume();
     _log('getDreamFit | job:', jobId);
-    return WWApi.getDreamFit(jobId, resume);
+    return WWApi.getDreamFit(jobId, resume, dreamCriteria);
 }
 
 async function _handleSearchJobs(criteria) {
-    const resume = await _requireResume();
-    _log('searchJobs | type:', criteria?.type);
+    // top_fits and free_search rank against the user's resume — require it.
+    // closing_soon and similar_roles work without a resume.
+    const needsResume = criteria?.criteria === 'top_fits' || criteria?.criteria === 'free_search';
+    const resume = needsResume
+        ? await _requireResume()
+        : (await WWStorage.getResume() ?? null);
+    _log('searchJobs | type:', criteria?.criteria);
     return WWApi.searchJobs(resume, criteria ?? {});
 }
 

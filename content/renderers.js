@@ -51,21 +51,26 @@ function _renderResult(mode, data) {
     else if (mode === 'SHOULD_APPLY')   _fillShouldIApply(card, data);
     else if (mode === 'DREAM_JOB')      _fillDreamJob(card, data);
     else if (mode === 'QA_SNIFF')       _fillQaSniff(card, data);
+    else if (mode === 'ROLE_EXPLAINER') _fillRoleExplainer(card, data);
     else if (mode === 'SEARCH_RESULTS') _fillSearchResults(card, data);
     else if (mode === 'ASK')            _fillAsk(card, data);
-    else                                _fillText(card, data, 'Day-to-Day Breakdown');
+    else                                _fillText(card, data, 'Result');
 
     container.appendChild(card);
+
+    // Track for report feature
+    _lastRenderedMode = mode;
+    _lastRenderedData = data;
 }
 
 function _fillBestFit(card, d) {
     const score = d.fitScore ?? 0;
-    const tier  = score >= 8 ? 'great' : score >= 5 ? 'decent' : 'poor';
+    const tier  = score >= 70 ? 'great' : score >= 40 ? 'decent' : 'poor';
     _label(card, 'Fit Analysis');
-    _el(card, 'div', 'wwai-score', `${score} / 10`);
+    _el(card, 'div', 'wwai-score', `${score} / 100`);
     const bar  = _el(card, 'div', 'wwai-score__bar');
     const fill = _el(bar, 'div', `wwai-score__fill wwai-score__fill--${tier}`);
-    fill.style.width = `${score * 10}%`;
+    fill.style.width = `${score}%`;
     _el(card, 'p', 'wwai-verdict', d.verdict ?? '');
     if (d.strengths?.length) { _label(card, 'Strengths'); _tagList(card, d.strengths, 'green'); }
     if (d.gaps?.length)      { _label(card, 'Gaps');      _tagList(card, d.gaps, 'red'); }
@@ -96,17 +101,47 @@ function _fillDreamJob(card, d) {
 }
 
 function _fillQaSniff(card, d) {
-    _label(card, 'Role Check');
-    // Backend uses isDisguised; fall back to !titleMatchesRole for compatibility
-    const disguised = d.isDisguised ?? (d.titleMatchesRole === false);
-    const v = _el(card, 'div', 'wwai-score',
-        disguised ? `⚠️ ${d.actualRole ?? 'Title may be misleading'}` : '✓ Title matches the role'
-    );
-    v.style.fontSize = '15px';
-    v.style.color = disguised ? '#ef4444' : '#22c55e';
+    _label(card, 'Role Analysis');
+    const mismatch = d.isMismatch ?? d.isDisguised ?? (d.titleMatchesRole === false);
+    if (!mismatch) {
+        const v = _el(card, 'div', 'wwai-score', '✓ Title matches the role');
+        v.style.fontSize = '15px';
+        v.style.color = '#22c55e';
+    }
     if (d.summary) _el(card, 'p', 'wwai-verdict', d.summary);
-    if (d.redFlags?.length)       { _label(card, 'Red Flags');           _tagList(card, d.redFlags, 'red'); }
+    if (d.alternativeTitles?.length) { _label(card, 'This role also fits'); _tagList(card, d.alternativeTitles, 'warn'); }
+    if (d.keyResponsibilities?.length) { _label(card, 'Key responsibilities'); _tagList(card, d.keyResponsibilities, 'green'); }
+    // Backward compat with old format
+    if (d.redFlags?.length)       { _label(card, 'Notes');               _tagList(card, d.redFlags, 'red'); }
     if (d.alsoGoodFitFor?.length) { _label(card, 'Also a good fit for'); _tagList(card, d.alsoGoodFitFor, 'warn'); }
+}
+
+function _fillRoleExplainer(card, d) {
+    const sections = [
+        { key: 'dayToDay', label: 'Day-to-Day' },
+        { key: 'team',     label: 'Team & Environment' },
+        { key: 'skills',   label: 'Skills Used' },
+    ];
+    let hasContent = false;
+    for (const { key, label } of sections) {
+        const items = d?.[key];
+        if (!Array.isArray(items) || !items.length) continue;
+        hasContent = true;
+        _label(card, label);
+        const ul = document.createElement('ul');
+        ul.style.cssText = 'margin:4px 0 0 0; padding-left:16px;';
+        items.forEach(item => {
+            const li = document.createElement('li');
+            li.textContent = item;
+            li.style.marginBottom = '2px';
+            ul.appendChild(li);
+        });
+        card.appendChild(ul);
+    }
+    if (!hasContent) {
+        // Fallback for plain-text role explainer (backward compat)
+        _fillText(card, typeof d === 'string' ? d : JSON.stringify(d), 'Role Summary');
+    }
 }
 
 function _fillAsk(card, data) {
@@ -155,22 +190,22 @@ function _fillSearchResults(card, data) {
 
 function _fillShouldIApply(card, { fit, dream, qa }) {
     const score      = fit?.fitScore ?? 0;
-    const suspicious = qa  ? (qa.isDisguised  ?? (qa.titleMatchesRole === false) ?? false) : false;
+    const suspicious = qa ? (qa.isMismatch ?? qa.isDisguised ?? (qa.titleMatchesRole === false) ?? false) : false;
     const isDream    = dream?.isDream ?? dream?.isDreamJob ?? false;
 
     let rec, tier;
-    if      (score >= 7 && !suspicious) { rec = '✅ Yes — Apply';               tier = 'great'; }
-    else if (score >= 5 || isDream)     { rec = '🤔 Maybe — Worth Considering';  tier = 'decent'; }
-    else                                { rec = '❌ Likely Not a Match';          tier = 'poor'; }
+    if      (score >= 70 && !suspicious) { rec = '✅ Yes — Apply';               tier = 'great'; }
+    else if (score >= 40 || isDream)     { rec = '🤔 Maybe — Worth Considering';  tier = 'decent'; }
+    else                                 { rec = '❌ Likely Not a Match';          tier = 'poor'; }
 
     _label(card, 'Should I Apply?');
     const v = _el(card, 'div', 'wwai-score', rec);
     v.style.fontSize = '16px';
     const bar  = _el(card, 'div', 'wwai-score__bar');
     const fill = _el(bar,  'div', `wwai-score__fill wwai-score__fill--${tier}`);
-    fill.style.width = `${score * 10}%`;
-    if (fit?.verdict) _el(card, 'p', 'wwai-verdict', `Fit ${score}/10 — ${fit.verdict}`);
-    if (suspicious)   _el(card, 'p', 'wwai-verdict', '⚠️ The job title may not fully match the actual role.');
+    fill.style.width = `${score}%`;
+    if (fit?.verdict) _el(card, 'p', 'wwai-verdict', `Fit ${score}/100 — ${fit.verdict}`);
+    if (suspicious)   _el(card, 'p', 'wwai-verdict', '💡 This role may also fit other job titles.');
     if (isDream && dream?.highlightInApplication) {
         _label(card, 'What to highlight');
         _tagList(card, [dream.highlightInApplication], 'warn');
@@ -212,10 +247,10 @@ function _injectBadge(row, score, isQa) {
     badge.style.cssText = 'margin-left:5px; font-size:12px; cursor:default;';
     badge.textContent = score == null
         ? '❓'
-        : (score >= 8 ? '🟢' : score >= 5 ? '🟡' : '🔴') + ` ${score}` + (isQa ? ' ⚠️' : '');
+        : (score >= 70 ? '🟢' : score >= 40 ? '🟡' : '🔴') + ` ${score}` + (isQa ? ' 💡' : '');
     badge.title = score == null
         ? 'Not yet analyzed'
-        : `Fit: ${score}/10${isQa ? ' — title may not match role' : ''}`;
+        : `Fit: ${score}/100${isQa ? ' — also fits other titles' : ''}`;
     titleEl.insertAdjacentElement('afterend', badge);
 }
 

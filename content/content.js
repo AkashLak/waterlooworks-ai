@@ -14,6 +14,10 @@ let _batchRunning      = false;
 let _lastSubmittedJobId = null; // dedup guard — prevents double-submit on modal class flicker
 let _lastSearchResult  = null; // last search data — restored when a job modal closes
 let _lastSearchQuery   = null; // free-text query — restores input field on job close
+let _activeFilter      = null; // Set of jobIds when table filter is active, null otherwise
+let _filterMeta        = null; // { shown, total, query } for filter card restoration
+let _lastRenderedMode  = null; // last rendered result mode — used by report feature
+let _lastRenderedData  = null; // last rendered result data — used by report feature
 
 // ── Panel HTML ─────────────────────────────────────────────────────────────────
 
@@ -32,14 +36,13 @@ function _buildPanel() {
             <div class="wwai-job-info wwai-hidden" id="wwai-job-info">
                 <div class="wwai-job-info__title"   id="wwai-job-title"></div>
                 <div class="wwai-job-info__meta"    id="wwai-job-meta"></div>
-                <div class="wwai-job-info__sniff wwai-hidden" id="wwai-sniff-flag">⚠️ Title may not match this role ▾</div>
+                <div class="wwai-job-info__sniff wwai-hidden" id="wwai-sniff-flag">💡 This role also fits other titles ▾</div>
                 <div class="wwai-sniff-detail wwai-hidden" id="wwai-sniff-detail"></div>
                 <div class="wwai-job-info__preview wwai-hidden" id="wwai-role-preview"></div>
             </div>
             <div class="wwai-actions wwai-hidden" id="wwai-actions">
                 <button class="wwai-btn wwai-btn--full wwai-btn--primary" data-mode="SHOULD_APPLY">✅ Should I Apply?</button>
                 <div class="wwai-actions__row">
-                    <button class="wwai-btn" data-mode="BEST_FIT">📊 Analyze Fit</button>
                     <button class="wwai-btn" data-mode="DREAM_JOB">⭐ Dream Job?</button>
                     <button class="wwai-btn" data-mode="ROLE_EXPLAINER">💼 Explain Role</button>
                 </div>
@@ -59,6 +62,7 @@ function _buildPanel() {
             <button class="wwai-btn wwai-btn--full wwai-btn--gold" id="wwai-batch-btn">
                 📋 Score All Jobs
             </button>
+            <div class="wwai-legend">🟢 ≥ 70 &nbsp;🟡 ≥ 40 &nbsp;🔴 &lt; 40</div>
             <div id="wwai-batch-progress" class="wwai-hidden">
                 <div class="wwai-progress">
                     <span id="wwai-batch-text"></span>
@@ -79,10 +83,15 @@ function _buildPanel() {
                         placeholder="Search jobs… e.g. remote, Toronto, data science">
                     <button class="wwai-btn wwai-btn--full" id="wwai-search-btn">🔍 Search</button>
                 </div>
+                <div class="wwai-search-bar">
+                    <input class="wwai-search-bar__input" id="wwai-roles-input" type="text"
+                        placeholder="Filter page by role… e.g. Data Science, PM">
+                    <button class="wwai-btn wwai-btn--full" id="wwai-roles-btn">🗂 Filter</button>
+                </div>
                 <div class="wwai-status-line" id="wwai-status-line"></div>
             </div>
         </div>
-        <div class="wwai-footer">WaterlooWorks AI — free to use</div>`;
+        <div class="wwai-footer">WaterlooWorks AI — free to use &nbsp;·&nbsp; <button id="wwai-report-btn" class="wwai-footer__report">⚑ Report issue</button></div>`;
     return panel;
 }
 
@@ -110,10 +119,10 @@ function _wireEvents(panel) {
         const open   = !detail.classList.contains('wwai-hidden');
         if (open) {
             _hide('wwai-sniff-detail');
-            flag.textContent = '⚠️ Title may not match this role ▾';
+            flag.textContent = '💡 This role also fits other titles ▾';
         } else {
             _show('wwai-sniff-detail');
-            flag.textContent = '⚠️ Title may not match this role ▴';
+            flag.textContent = '💡 This role also fits other titles ▴';
         }
     });
 
@@ -121,6 +130,13 @@ function _wireEvents(panel) {
     const searchGo = () => { const q = searchInput.value.trim(); if (q) _handleFreeSearch(q); };
     document.getElementById('wwai-search-btn').addEventListener('click', searchGo);
     searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchGo(); });
+
+    const rolesInput = document.getElementById('wwai-roles-input');
+    const rolesGo = () => { const q = rolesInput.value.trim(); if (q) _handleSimilarRoles(q); };
+    document.getElementById('wwai-roles-btn').addEventListener('click', rolesGo);
+    rolesInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') rolesGo(); });
+
+    document.getElementById('wwai-report-btn').addEventListener('click', _handleReport);
 
     document.getElementById('wwai-batch-btn').addEventListener('click', _handleBatch);
     document.getElementById('wwai-cancel-btn').addEventListener('click', () =>
@@ -188,7 +204,7 @@ function _onJobOpen(detail) {
     _hide('wwai-sniff-flag');
     _hide('wwai-sniff-detail');
     document.getElementById('wwai-sniff-detail').innerHTML = '';
-    document.getElementById('wwai-sniff-flag').textContent = '⚠️ Title may not match this role ▾';
+    document.getElementById('wwai-sniff-flag').textContent = '💡 This role also fits other titles ▾';
     _hide('wwai-role-preview');
 
     // Skip submit if this job was already submitted in this session (modal class flicker guard)
@@ -214,7 +230,11 @@ function _onJobClose() {
     _show('wwai-batch-btn'); _show('wwai-suggestions');
     _clearResult(); _clearLoading();
 
-    if (_lastSearchResult) {
+    if (_activeFilter && _filterMeta) {
+        // Restore filter status card — table is still filtered in DOM
+        _hide('wwai-empty');
+        _renderFilterCard(_filterMeta.shown, _filterMeta.total, _filterMeta.query);
+    } else if (_lastSearchResult) {
         _hide('wwai-empty');
         _renderResult('SEARCH_RESULTS', _lastSearchResult);
         if (_lastSearchQuery) {
@@ -255,14 +275,19 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
     }
     WWStorage.getResume().then(r => _updateResumeStatus(!!r));
     chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'local' && 'ww_resume' in changes) {
+        if (area !== 'local') return;
+        if ('ww_resume' in changes) {
             _updateResumeStatus(!!changes.ww_resume.newValue);
-            // Invalidate resume-specific session caches
             Object.keys(sessionStorage)
                 .filter(k => k.startsWith('wwai_') && (k.endsWith('_BEST_FIT') || k.endsWith('_DREAM_JOB') || k.endsWith('_BATCH_FIT')))
                 .forEach(k => sessionStorage.removeItem(k));
-            // Clear any stale no-resume error from the result area
             _clearResult();
+        }
+        if ('ww_dream_criteria' in changes) {
+            // Bust dream job session cache when priorities change
+            Object.keys(sessionStorage)
+                .filter(k => k.startsWith('wwai_') && k.endsWith('_DREAM_JOB'))
+                .forEach(k => sessionStorage.removeItem(k));
         }
     });
 
