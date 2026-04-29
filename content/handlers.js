@@ -681,7 +681,7 @@ async function _runDirectScrapePhase2() {
                         ...detail,
                         location:              row.location    || detail.location    || '',
                         city:                  row.city        || detail.city        || '',
-                        openings:              row.openings    ?? parseInt(detail.openings, 10) || null,
+                        openings:              (row.openings ?? parseInt(detail.openings, 10)) || null,
                         term:                  row.term        || detail.term        || '',
                         deadline:              row.appDeadline || detail.appDeadline || null,
                         organization:          row.employer    || detail.employer    || '',
