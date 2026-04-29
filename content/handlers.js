@@ -553,6 +553,181 @@ async function _handleBatch() {
     }
 }
 
+// ── Direct HTTP scraping ────────────────────────────────────────────────────────
+//
+// Phase 1 — fetch all listing pages (JSON) → sync row-level data to backend.
+//            Triggered by __wwai_listing event (fires automatically on page load).
+// Phase 2 — fetch each job's description HTML → submit full jobData to backend.
+//            Triggered by __wwai_detail_post event (fires when user first clicks a job).
+//
+// Both phases use WaterlooWorks's own authenticated session — no extra login needed.
+
+const _SCRAPE_CONCURRENCY = 5; // max simultaneous detail fetches
+
+async function _directFetch(url, options, retries = 2) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const res = await fetch(url, options);
+            if (res.ok) return res;
+        } catch (_) {}
+        if (attempt < retries) await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
+    }
+    return null;
+}
+
+async function _runDirectScrapePhase1() {
+    if (!_directListingToken || !_directListingUrl) {
+        _directScrapeState = 0;
+        return;
+    }
+
+    _updateStatusLine('Syncing all jobs…');
+
+    const template = new URL(_directListingUrl);
+    template.searchParams.set('itemsPerPage', '100');
+
+    const allRows = [];
+    let page  = 1;
+    let total = Infinity;
+
+    while (allRows.length < total) {
+        template.searchParams.set('page', String(page));
+        const res = await _directFetch(template.toString());
+        if (!res) break;
+
+        let json;
+        try { json = await res.json(); } catch { break; }
+
+        if (total === Infinity) total = json.totalResults ?? 0;
+        if (!json.data?.length) break;
+
+        for (const apiRow of json.data) {
+            const row = WWScaper.parseListingRow(apiRow);
+            if (row.jobId) allRows.push(row);
+        }
+
+        if (allRows.length >= total) break;
+        page++;
+    }
+
+    if (!allRows.length) {
+        _directScrapeState = 0;
+        await _refreshStatus();
+        return;
+    }
+
+    _directScrapeRows = allRows;
+
+    // Sync row-level metadata to backend immediately (no descriptions yet)
+    const syncPayload = allRows.map(({ boardUrl, ...r }) => r);
+    try { await WWAnalyzer.syncActiveJobs(syncPayload); } catch (_) {}
+
+    _scheduleTableSync(); // refresh badge injection with newly synced rows
+
+    if (_directDetailTokens.length > 0) {
+        _directScrapeState = 3;
+        _runDirectScrapePhase2();
+    } else {
+        _directScrapeState = 2;
+        _updateStatusLine(`${allRows.length} jobs synced — click any job once to load descriptions`);
+    }
+}
+
+async function _runDirectScrapePhase2() {
+    const rows = _directScrapeRows;
+    if (!rows?.length || !_directDetailTokens.length) return;
+
+    // Find which captured token returns job detail HTML (not the JSON geo-data token)
+    const htmlToken = await _findHtmlDetailToken(rows[0]);
+    if (!htmlToken) {
+        _directScrapeState = 4;
+        _updateStatusLine(`${rows.length} jobs synced`);
+        await _refreshStatus();
+        return;
+    }
+
+    const detailOrigin = _directDetailUrl
+        ? new URL(_directDetailUrl).origin
+        : 'https://waterlooworks.uwaterloo.ca';
+    const defaultDetailPath = '/myAccount/co-op/direct/jobs.htm';
+
+    _updateStatusLine(`Loading ${rows.length} job descriptions…`);
+
+    let completed = 0;
+
+    for (let i = 0; i < rows.length; i += _SCRAPE_CONCURRENCY) {
+        await Promise.all(
+            rows.slice(i, i + _SCRAPE_CONCURRENCY).map(async (row) => {
+                if (!row.jobId) return;
+                try {
+                    const detailUrl = detailOrigin + (row.boardUrl ?? defaultDetailPath);
+                    const body = `action=${encodeURIComponent(htmlToken)}&postingId=${encodeURIComponent(row.jobId)}`;
+                    const res  = await _directFetch(detailUrl, {
+                        method:  'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body,
+                    });
+                    if (!res) return;
+
+                    const html = await res.text();
+                    if (!html.includes('tag__key-value-list')) return;
+
+                    const detail = WWScaper.scrapeJobDetailFromHtml(
+                        html, row.jobId, row.title, row.employer, row.division
+                    );
+                    if (!detail) return;
+
+                    const jobData = {
+                        ...detail,
+                        location:              row.location    || detail.location    || '',
+                        city:                  row.city        || detail.city        || '',
+                        openings:              row.openings    ?? parseInt(detail.openings, 10) || null,
+                        term:                  row.term        || detail.term        || '',
+                        deadline:              row.appDeadline || detail.appDeadline || null,
+                        organization:          row.employer    || detail.employer    || '',
+                        description:           WWScaper.extractJobDescription(detail) || null,
+                        employmentArrangement: detail.employmentLocationArrangement  || '',
+                        externalUrl:           _decodeHtml(detail.ifByWebsiteGoTo || detail.ifByEmailSendTo || ''),
+                    };
+
+                    await WWAnalyzer.submitJob(jobData);
+                    completed++;
+                } catch (_) {}
+            })
+        );
+        if (i + _SCRAPE_CONCURRENCY < rows.length) {
+            _updateStatusLine(`Loading descriptions… ${completed}/${rows.length}`);
+        }
+    }
+
+    _directScrapeState = 4;
+    _updateStatusLine(`${completed} jobs ready`);
+    await _refreshStatus();
+    _scheduleTableSync();
+}
+
+async function _findHtmlDetailToken(sampleRow) {
+    // Try each captured POST token on a single job; return the one that produces HTML with job fields.
+    // The geo-data token returns JSON; the job-detail token returns HTML — we want the latter.
+    const detailOrigin = _directDetailUrl
+        ? new URL(_directDetailUrl).origin
+        : 'https://waterlooworks.uwaterloo.ca';
+    const detailUrl = detailOrigin + (sampleRow.boardUrl ?? '/myAccount/co-op/direct/jobs.htm');
+
+    for (const token of _directDetailTokens) {
+        const body = `action=${encodeURIComponent(token)}&postingId=${encodeURIComponent(sampleRow.jobId)}`;
+        const res  = await _directFetch(detailUrl, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body,
+        });
+        if (!res) continue;
+        const text = await res.text();
+        if (text.includes('tag__key-value-list')) return token;
+    }
+    return null;
+}
+
 function _tallyStat(stats, score) {
     if (score >= 70) stats.great++;
     else if (score >= 40) stats.decent++;

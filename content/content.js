@@ -18,6 +18,14 @@ let _lastRenderedMode  = null; // last rendered result mode — used by report f
 let _lastRenderedData  = null; // last rendered result data — used by report feature
 let _allJobsMap        = {};   // latest getAllJobs snapshot — fallback for qa_disguise in panel
 
+// ── Direct HTTP scrape state (populated by MAIN world interceptor) ─────────────
+let _directListingToken = null; // action token from WaterlooWorks's own listing GET
+let _directListingUrl   = null; // full captured URL — reused as pagination template
+let _directDetailTokens = [];   // all captured POST action tokens (HTML token is typically last)
+let _directDetailUrl    = null; // URL used for job detail POSTs
+let _directScrapeRows   = null; // rows collected in Phase 1; reused by Phase 2
+let _directScrapeState  = 0;    // 0=idle 1=phase1 2=awaiting_detail_token 3=phase2 4=done
+
 // ── Panel HTML ─────────────────────────────────────────────────────────────────
 
 function _buildPanel() {
@@ -251,6 +259,30 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
             Object.keys(sessionStorage)
                 .filter(k => k.startsWith('wwai_') && k.endsWith('_DREAM_JOB'))
                 .forEach(k => sessionStorage.removeItem(k));
+        }
+    });
+
+    // ── Direct scrape token listeners (events from MAIN world interceptor) ──
+    document.addEventListener('__wwai_listing', (e) => {
+        if (_directListingToken) return; // capture once per page load
+        _directListingToken = e.detail.token;
+        _directListingUrl   = e.detail.url;
+        if (_directScrapeState === 0) {
+            _directScrapeState = 1;
+            // Short delay so WaterlooWorks finishes its own init XHRs first
+            setTimeout(_runDirectScrapePhase1, 2000);
+        }
+    });
+
+    document.addEventListener('__wwai_detail_post', (e) => {
+        if (!_directDetailTokens.includes(e.detail.token)) {
+            _directDetailTokens.push(e.detail.token);
+        }
+        if (!_directDetailUrl) _directDetailUrl = e.detail.url;
+        // If Phase 1 finished but we were blocked waiting for a detail token, start Phase 2 now
+        if (_directScrapeState === 2) {
+            _directScrapeState = 3;
+            _runDirectScrapePhase2();
         }
     });
 

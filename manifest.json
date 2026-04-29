@@ -22,6 +22,12 @@
   "content_scripts": [
     {
       "matches": ["*://waterlooworks.uwaterloo.ca/*"],
+      "js": ["content/interceptor.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["*://waterlooworks.uwaterloo.ca/*"],
       "js": [
         "lib/storage.js",
         "lib/scraper.js",
