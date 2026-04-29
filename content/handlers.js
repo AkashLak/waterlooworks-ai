@@ -234,6 +234,27 @@ async function _onTableChange() {
             if (id) jobsMap[id] = job;
         }
         _allJobsMap = jobsMap; // cache for sniff flag fallback in _renderAnalysesReady
+
+        // If a job modal is open and the sniff flag hasn't shown yet
+        // (because _renderAnalysesReady ran before this map was ready), show it now.
+        if (_currentJobId) {
+            const flag = document.getElementById('wwai-sniff-flag');
+            if (flag && flag.classList.contains('wwai-hidden')) {
+                const qa = _allJobsMap[_currentJobId]?.qa_disguise ?? null;
+                if (qa && (qa.isMismatch ?? qa.isDisguised ?? (qa.titleMatchesRole === false))) {
+                    flag.textContent = '💡 This role also fits other titles ▾';
+                    _show('wwai-sniff-flag');
+                    const detailEl = document.getElementById('wwai-sniff-detail');
+                    if (detailEl && !detailEl.innerHTML.trim()) {
+                        const card = document.createElement('div');
+                        card.className = 'wwai-result';
+                        _fillQaSniff(card, qa);
+                        detailEl.appendChild(card);
+                    }
+                }
+            }
+        }
+
         // Clear stale session cache for jobs the backend no longer has a record of.
         // Prevents old scores from a wiped DB from showing as badges.
         for (const row of rows) {
