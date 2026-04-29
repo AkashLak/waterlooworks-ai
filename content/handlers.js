@@ -176,19 +176,40 @@ function _renderAnalysesReady() {
         }
     }
 
-    // Auto-show first bullet of role explainer (structured JSON or plain text) as preview
-    const roleData = _currentAnalyses?.role_explainer;
-    const previewText = typeof roleData === 'string'
-        ? roleData.split(/\.\s/)[0].trim()
-        : (Array.isArray(roleData?.dayToDay) && roleData.dayToDay[0]) || '';
-    if (previewText) {
+    // Show first dayToDay bullet as a one-line role preview
+    const roleRaw = _currentAnalyses?.role_explainer;
+    let firstBullet = '';
+    if (typeof roleRaw === 'string') {
+        try { firstBullet = JSON.parse(roleRaw)?.dayToDay?.[0] ?? ''; }
+        catch { firstBullet = roleRaw.split(/\.\s/)[0].trim(); }
+    } else if (Array.isArray(roleRaw?.dayToDay)) {
+        firstBullet = roleRaw.dayToDay[0] ?? '';
+    }
+    if (firstBullet) {
         const preview = document.getElementById('wwai-role-preview');
-        preview.textContent = previewText.endsWith('.') ? previewText : previewText + '.';
+        preview.textContent = firstBullet.endsWith('.') ? firstBullet : firstBullet + '.';
         _show('wwai-role-preview');
     }
 
-    // Auto-run Should I Apply so the user sees their result immediately
-    _handleShouldIApply();
+    _clearLoading();
+
+    // Silently pre-fetch fit score so clicking Should I Apply? is instant
+    _prefetchFitScore();
+}
+
+async function _prefetchFitScore() {
+    if (!_currentJobId || _getCached(_currentJobId, 'BEST_FIT')) return;
+    try {
+        const fit = await WWAnalyzer.getFitScore(_currentJobId);
+        _setCached(_currentJobId, 'BEST_FIT', fit);
+        _setCached(_currentJobId, 'BATCH_FIT', fit);
+        const tableRow = WWScaper.scrapeRowByJobId(_currentJobId);
+        if (tableRow) {
+            const qa   = _currentAnalyses?.qa_disguise ?? null;
+            const isQa = qa ? (qa.isMismatch ?? qa.isDisguised ?? (qa.titleMatchesRole === false)) : false;
+            _injectBadge(tableRow, fit.fitScore ?? fit.fit_score, isQa);
+        }
+    } catch (_) {}
 }
 
 async function _onTableChange() {
@@ -319,15 +340,15 @@ async function _handleShouldIApply() {
             return r;
         })();
 
-        // Write BATCH_FIT so the badge appears in the table row for this job
+        // Ensure badge is in the table (prefetch may have already done this, but guard for direct clicks)
         if (!_getCached(_currentJobId, 'BATCH_FIT')) {
             _setCached(_currentJobId, 'BATCH_FIT', fit);
-        }
-        const tableRow = WWScaper.scrapeRowByJobId(_currentJobId);
-        if (tableRow) {
-            const qa   = _currentAnalyses?.qa_disguise ?? null;
-            const isQa = qa ? (qa.isMismatch ?? qa.isDisguised ?? (qa.titleMatchesRole === false)) : false;
-            _injectBadge(tableRow, fit.fitScore ?? fit.fit_score, isQa);
+            const tableRow = WWScaper.scrapeRowByJobId(_currentJobId);
+            if (tableRow) {
+                const qa   = _currentAnalyses?.qa_disguise ?? null;
+                const isQa = qa ? (qa.isMismatch ?? qa.isDisguised ?? (qa.titleMatchesRole === false)) : false;
+                _injectBadge(tableRow, fit.fitScore ?? fit.fit_score, isQa);
+            }
         }
 
         const dream = _currentAnalyses?.dream_job ?? null;
