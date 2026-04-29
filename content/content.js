@@ -59,20 +59,7 @@ function _buildPanel() {
                 <button class="wwai-ask__btn" id="wwai-ask-btn">Ask</button>
             </div>
             <hr class="wwai-divider">
-            <button class="wwai-btn wwai-btn--full wwai-btn--gold" id="wwai-batch-btn">
-                📋 Score All Jobs
-            </button>
-            <div class="wwai-legend">🟢 ≥ 70 &nbsp;🟡 ≥ 40 &nbsp;🔴 &lt; 40</div>
-            <div id="wwai-batch-progress" class="wwai-hidden">
-                <div class="wwai-progress">
-                    <span id="wwai-batch-text"></span>
-                    <div class="wwai-progress__bar">
-                        <div class="wwai-progress__fill" id="wwai-batch-bar" style="width:0%"></div>
-                    </div>
-                </div>
-                <button class="wwai-btn wwai-btn--full" id="wwai-cancel-btn">Cancel</button>
-            </div>
-            <div id="wwai-batch-summary" class="wwai-summary wwai-hidden"></div>
+            <div class="wwai-legend">🟢 ≥ 70 &nbsp;🟡 ≥ 40 &nbsp;🔴 &lt; 40 &nbsp;— badges appear as you browse</div>
             <hr class="wwai-divider">
             <div class="wwai-suggestions" id="wwai-suggestions">
                 <div class="wwai-suggestions__title">Smart Suggestions</div>
@@ -138,10 +125,6 @@ function _wireEvents(panel) {
 
     document.getElementById('wwai-report-btn').addEventListener('click', _handleReport);
 
-    document.getElementById('wwai-batch-btn').addEventListener('click', _handleBatch);
-    document.getElementById('wwai-cancel-btn').addEventListener('click', () =>
-        WWAnalyzer.cancelBatch()
-    );
 }
 
 // ── Panel open / close ─────────────────────────────────────────────────────────
@@ -212,8 +195,7 @@ function _onJobOpen(detail) {
 
     _show('wwai-job-info'); _show('wwai-actions');
     _show('wwai-ask-divider'); _show('wwai-ask');
-    _hide('wwai-empty'); _hide('wwai-batch-btn');
-    _hide('wwai-batch-summary'); _hide('wwai-suggestions');
+    _hide('wwai-empty'); _hide('wwai-suggestions');
     _clearLoading(); _clearResult();
 
     if (!alreadySubmitted) {
@@ -227,7 +209,7 @@ function _onJobOpen(detail) {
 function _onJobClose() {
     _hide('wwai-job-info'); _hide('wwai-actions');
     _hide('wwai-ask-divider'); _hide('wwai-ask');
-    _show('wwai-batch-btn'); _show('wwai-suggestions');
+    _show('wwai-suggestions');
     _clearResult(); _clearLoading();
 
     if (_activeFilter && _filterMeta) {

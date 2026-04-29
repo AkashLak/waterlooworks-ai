@@ -308,6 +308,18 @@ async function _handleShouldIApply() {
             _setCached(_currentJobId, 'BEST_FIT', r);
             return r;
         })();
+
+        // Write BATCH_FIT so the badge appears in the table row for this job
+        if (!_getCached(_currentJobId, 'BATCH_FIT')) {
+            _setCached(_currentJobId, 'BATCH_FIT', fit);
+        }
+        const tableRow = WWScaper.scrapeRowByJobId(_currentJobId);
+        if (tableRow) {
+            const qa   = _currentAnalyses?.qa_disguise ?? null;
+            const isQa = qa ? (qa.isMismatch ?? qa.isDisguised ?? (qa.titleMatchesRole === false)) : false;
+            _injectBadge(tableRow, fit.fitScore ?? fit.fit_score, isQa);
+        }
+
         const dream = _currentAnalyses?.dream_job ?? null;
         const qa    = _currentAnalyses?.qa_disguise ?? null;
         _renderResult('SHOULD_APPLY', { fit, dream, qa });
