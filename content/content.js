@@ -175,7 +175,7 @@ function _onJobOpen(detail) {
     _hide('wwai-sniff-flag');
     _hide('wwai-sniff-detail');
     document.getElementById('wwai-sniff-detail').innerHTML = '';
-    document.getElementById('wwai-sniff-flag').textContent = '💡 Also known as ▾';
+    document.getElementById('wwai-sniff-flag').textContent = '💡 Related Job Titles ▾';
     _hide('wwai-role-preview');
 
     // Skip submit if this job was already submitted in this session (modal class flicker guard)

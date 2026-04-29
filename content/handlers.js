@@ -168,7 +168,7 @@ function _qaHasAlternateTitles(qa) {
 
 function _showSniffFlag(qa) {
     const flag = document.getElementById('wwai-sniff-flag');
-    if (flag) flag.textContent = '💡 Also known as ▾';
+    if (flag) flag.textContent = '💡 Related Job Titles ▾';
     _show('wwai-sniff-flag');
     const detailEl = document.getElementById('wwai-sniff-detail');
     if (detailEl && !detailEl.innerHTML.trim()) {

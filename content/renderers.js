@@ -97,7 +97,7 @@ function _fillDreamJob(card, d) {
 }
 
 function _fillQaSniff(card, d) {
-    if (d.alternativeTitles?.length) { _label(card, 'Also known as'); _tagList(card, d.alternativeTitles, 'warn'); }
+    if (d.alternativeTitles?.length) { _label(card, 'Related job titles'); _tagList(card, d.alternativeTitles, 'warn'); }
     if (d.keyResponsibilities?.length) { _label(card, 'Key responsibilities'); _tagList(card, d.keyResponsibilities, 'green'); }
 }
 
