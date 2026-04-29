@@ -223,7 +223,7 @@ function _renderError(err) {
 
 // ── Badge injection ────────────────────────────────────────────────────────────
 
-function _injectBadge(row, score, isQa) {
+function _injectBadge(row, score) {
     const titleEl = row.titleEl;
     if (!titleEl) return;
     titleEl.closest('tr.table__row--body')?.querySelector('.wwai-badge')?.remove();
@@ -233,10 +233,10 @@ function _injectBadge(row, score, isQa) {
     badge.style.cssText = 'margin-left:5px; font-size:12px; cursor:default;';
     badge.textContent = score == null
         ? '❓'
-        : (score >= 70 ? '🟢' : score >= 40 ? '🟡' : '🔴') + ` ${score}` + (isQa ? ' 💡' : '');
+        : (score >= 70 ? '🟢' : score >= 40 ? '🟡' : '🔴') + ` ${score}`;
     badge.title = score == null
         ? 'Not yet analyzed'
-        : `Fit: ${score}/100${isQa ? ' — also fits other titles' : ''}`;
+        : `Fit: ${score}/100`;
     titleEl.insertAdjacentElement('afterend', badge);
 }
 
@@ -248,8 +248,6 @@ function _injectPrecomputedBadges(rows, jobsMap) {
         const score = batchFit?.fitScore ?? batchFit?.fit_score
                    ?? (job ? (job.fitScore ?? job.fit_score ?? null) : null);
         if (score == null) continue; // no score yet — don't show ❓ passively
-        const qa = job ? (job.qa_disguise || job.qaResult) : null;
-        const isQa = qa ? (Array.isArray(qa.alternativeTitles) && qa.alternativeTitles.length > 0) : false;
-        _injectBadge(row, score, isQa);
+        _injectBadge(row, score);
     }
 }

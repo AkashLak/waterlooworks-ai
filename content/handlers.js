@@ -211,17 +211,15 @@ function _renderAnalysesReady() {
 }
 
 async function _prefetchFitScore() {
-    if (!_currentJobId || _getCached(_currentJobId, 'BEST_FIT')) return;
+    const jobId = _currentJobId; // capture before any await — modal may close while scoring runs
+    if (!jobId || _getCached(jobId, 'BEST_FIT')) return;
     try {
-        const fit = await WWAnalyzer.getFitScore(_currentJobId);
-        _setCached(_currentJobId, 'BEST_FIT', fit);
-        _setCached(_currentJobId, 'BATCH_FIT', fit);
-        const tableRow = WWScaper.scrapeRowByJobId(_currentJobId);
-        if (tableRow) {
-            const qa   = _currentAnalyses?.qa_disguise ?? null;
-            const isQa = qa ? (qa.isMismatch ?? qa.isDisguised ?? (qa.titleMatchesRole === false)) : false;
-            _injectBadge(tableRow, fit.fitScore ?? fit.fit_score, isQa);
-        }
+        const fit = await WWAnalyzer.getFitScore(jobId);
+        _setCached(jobId, 'BEST_FIT', fit);
+        _setCached(jobId, 'BATCH_FIT', fit);
+        // Inject badge even if modal closed — table row is always in the DOM
+        const tableRow = WWScaper.scrapeRowByJobId(jobId);
+        if (tableRow) _injectBadge(tableRow, fit.fitScore ?? fit.fit_score);
     } catch (_) {}
 }
 
@@ -369,11 +367,7 @@ async function _handleShouldIApply() {
         if (!_getCached(_currentJobId, 'BATCH_FIT')) {
             _setCached(_currentJobId, 'BATCH_FIT', fit);
             const tableRow = WWScaper.scrapeRowByJobId(_currentJobId);
-            if (tableRow) {
-                const qa   = _currentAnalyses?.qa_disguise ?? null;
-                const isQa = qa ? (qa.isMismatch ?? qa.isDisguised ?? (qa.titleMatchesRole === false)) : false;
-                _injectBadge(tableRow, fit.fitScore ?? fit.fit_score, isQa);
-            }
+            if (tableRow) _injectBadge(tableRow, fit.fitScore ?? fit.fit_score);
         }
 
         const dream = _currentAnalyses?.dream_job ?? null;
@@ -473,7 +467,7 @@ async function _handleBatch() {
     } catch (_) {}
 
     const rows = WWScaper.scrapeAllListingRows();
-    const stats = { great: 0, decent: 0, poor: 0, disguised: 0 };
+    const stats = { great: 0, decent: 0, poor: 0 };
     let unseenCount = 0, scoredCount = 0;
     const bar = document.getElementById('wwai-batch-bar'), txt = document.getElementById('wwai-batch-text');
 
@@ -483,20 +477,16 @@ async function _handleBatch() {
         const jobRec = allJobsMap[row.jobId];
         bar.style.width = `${Math.round(((i + 1) / rows.length) * 100)}%`;
 
-        if (!jobRec) { unseenCount++; _injectBadge(row, null, false); continue; }
+        if (!jobRec) { unseenCount++; _injectBadge(row, null); continue; }
 
         // Skip jobs with no description — scoring without content produces meaningless results
         const hasDescription = !!(jobRec.job_summary || jobRec.job_responsibilities);
-        if (!hasDescription) { unseenCount++; _injectBadge(row, null, false); continue; }
-
-        const qa = jobRec.qa_disguise || jobRec.qaResult;
-        const isQa = qa ? (qa.isDisguised ?? !qa.titleMatchesRole ?? false) : false;
-        if (isQa) stats.disguised++;
+        if (!hasDescription) { unseenCount++; _injectBadge(row, null); continue; }
 
         const fitScore = jobRec.fitScore ?? jobRec.fit_score ?? null;
         if (fitScore != null) {
             _setCached(row.jobId, 'BATCH_FIT', { fitScore });
-            _injectBadge(row, fitScore, isQa);
+            _injectBadge(row, fitScore);
             _tallyStat(stats, fitScore);
             scoredCount++;
         } else {
@@ -505,7 +495,7 @@ async function _handleBatch() {
             if (sessionCached) {
                 const cachedScore = sessionCached.fitScore ?? sessionCached.fit_score;
                 _setCached(row.jobId, 'BATCH_FIT', sessionCached);
-                _injectBadge(row, cachedScore, isQa);
+                _injectBadge(row, cachedScore);
                 _tallyStat(stats, cachedScore);
                 scoredCount++;
             } else {
@@ -515,10 +505,10 @@ async function _handleBatch() {
                     const score = fit.fitScore ?? fit.fit_score;
                     _setCached(row.jobId, 'BEST_FIT', fit);
                     _setCached(row.jobId, 'BATCH_FIT', fit);
-                    _injectBadge(row, score, isQa);
+                    _injectBadge(row, score);
                     _tallyStat(stats, score);
                     scoredCount++;
-                } catch (_) { _injectBadge(row, null, isQa); }
+                } catch (_) { _injectBadge(row, null); }
             }
         }
     }
@@ -526,7 +516,6 @@ async function _handleBatch() {
     _batchRunning = false;
     _hide('wwai-batch-progress');
     const parts = [`🟢 ${stats.great} great fits`, `🟡 ${stats.decent} decent matches`, `🔴 ${stats.poor} poor fits`];
-    if (stats.disguised) parts.push(`⚠️ ${stats.disguised} title mismatches`);
     if (unseenCount) parts.push(`${unseenCount} need descriptions — open each title once to enable scoring`);
     if (WWAnalyzer.isBatchCancelled()) parts.push('(cancelled)');
     const summaryEl = document.getElementById('wwai-batch-summary');

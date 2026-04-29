@@ -197,6 +197,9 @@ function _onJobOpen(detail) {
     if (!alreadySubmitted) {
         _lastSubmittedJobId = detail.jobId;
         _submitAndPoll(detail);
+        // Start fit score in parallel — description is already in DB from direct scrape,
+        // so scoring doesn't need to wait for qa/role analyses to finish first.
+        _prefetchFitScore();
     } else {
         _restoreAnalyses(detail.jobId);
     }

@@ -60,7 +60,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return respond(WWApi.getJobAnalyses(message.jobId));
 
         case 'getAllJobs':
-            return respond(WWApi.getAllJobs(message.filters));
+            return respond(_handleGetAllJobs(message.filters));
 
         case 'getFitScore':
             return respond(_handleGetFitScore(message.jobId));
@@ -134,6 +134,20 @@ async function _handleAskQuestion(jobId, question) {
     const resume = await WWStorage.getResume(); // optional — send if available, don't block if not
     _log('askQuestion | job:', jobId);
     return WWApi.askQuestion(jobId, question, resume);
+}
+
+async function _handleGetAllJobs(filters) {
+    const resume = await WWStorage.getResume();
+    if (resume) {
+        const hash = await _sha256(resume);
+        return WWApi.getAllJobs({ ...filters, resumeHash: hash });
+    }
+    return WWApi.getAllJobs(filters);
+}
+
+async function _sha256(text) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 async function _requireResume() {
