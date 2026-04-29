@@ -196,9 +196,9 @@ function _onJobOpen(detail) {
 
     if (!alreadySubmitted) {
         _lastSubmittedJobId = detail.jobId;
-        _submitAndPoll(detail);
+        // _submitAndPoll(detail); // disabled for direct HTTP scrape testing
     } else {
-        _restoreAnalyses(detail.jobId);
+        // _restoreAnalyses(detail.jobId); // disabled for direct HTTP scrape testing
     }
 }
 
