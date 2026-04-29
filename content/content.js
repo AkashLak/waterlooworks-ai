@@ -297,7 +297,7 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         for (const entry of performance.getEntriesByType('resource')) {
             const url = entry.name;
             if ((url.includes('/jobs.htm') || url.includes('/applications.htm')) &&
-                 url.includes('&page=') && ACTION_RE.test(url)) {
+                 /[?&]page=/.test(url) && ACTION_RE.test(url)) {
                 const m = url.match(ACTION_RE);
                 if (m) { _onListingToken(decodeURIComponent(m[1]), url); return true; }
             }
@@ -312,7 +312,7 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
             for (const entry of list.getEntries()) {
                 const url = entry.name;
                 if ((url.includes('/jobs.htm') || url.includes('/applications.htm')) &&
-                     url.includes('&page=') && url.includes('action=')) {
+                     /[?&]page=/.test(url) && url.includes('action=')) {
                     const m = url.match(/[?&]action=([^&\s]+)/);
                     if (m) {
                         _onListingToken(decodeURIComponent(m[1]), url);
