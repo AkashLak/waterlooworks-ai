@@ -273,7 +273,7 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         _directListingUrl   = url;
         if (_directScrapeState === 0) {
             _directScrapeState = 1;
-            setTimeout(_runDirectScrapePhase1, 500);
+            _runDirectScrapePhase1(); // perf entry is already complete — no delay needed
         }
     }
 
@@ -286,19 +286,54 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         }
     }
 
-    // Read tokens already written to DOM before document_idle (the common case)
-    const _root = document.documentElement;
-    if (_root.dataset.wwaiListingToken && _root.dataset.wwaiListingUrl) {
-        _onListingToken(_root.dataset.wwaiListingToken, _root.dataset.wwaiListingUrl);
+    // ── Listing token: read from Performance API ──────────────────────────────
+    // WaterlooWorks fires its own listing GET on page load. By document_idle it's
+    // already in the resource timing entries with the full URL + action token.
+    // This is more reliable than XHR interception for the listing request.
+
+    function _scanPerfForListingToken() {
+        const ACTION_RE = /[?&]action=([^&\s]+)/;
+        for (const entry of performance.getEntriesByType('resource')) {
+            const url = entry.name;
+            if ((url.includes('/jobs.htm') || url.includes('/applications.htm')) &&
+                 url.includes('&page=') && ACTION_RE.test(url)) {
+                const m = url.match(ACTION_RE);
+                if (m) { _onListingToken(decodeURIComponent(m[1]), url); return true; }
+            }
+        }
+        return false;
     }
+
+    if (!_scanPerfForListingToken()) {
+        // Listing might still be in-flight (unlikely but possible on slow connections)
+        const _listingObserver = new PerformanceObserver((list) => {
+            if (_directListingToken) { _listingObserver.disconnect(); return; }
+            for (const entry of list.getEntries()) {
+                const url = entry.name;
+                if ((url.includes('/jobs.htm') || url.includes('/applications.htm')) &&
+                     url.includes('&page=') && url.includes('action=')) {
+                    const m = url.match(/[?&]action=([^&\s]+)/);
+                    if (m) {
+                        _onListingToken(decodeURIComponent(m[1]), url);
+                        _listingObserver.disconnect();
+                        return;
+                    }
+                }
+            }
+        });
+        _listingObserver.observe({ entryTypes: ['resource'] });
+    }
+
+    // ── Detail tokens: read from DOM dataset written by MAIN world interceptor ──
+    // The interceptor writes detail POST tokens (which contain postingId in the body)
+    // to dataset so they survive the document_start → document_idle gap.
+
+    const _root = document.documentElement;
     if (_root.dataset.wwaiDetailTokens) {
         for (const t of _root.dataset.wwaiDetailTokens.split('\n').filter(Boolean)) {
             _onDetailToken(t, _root.dataset.wwaiDetailUrl);
         }
     }
-
-    // Also listen for tokens captured after init (e.g. detail token from first job click)
-    document.addEventListener('__wwai_listing',     (e) => _onListingToken(e.detail.token, e.detail.url));
     document.addEventListener('__wwai_detail_post', (e) => _onDetailToken(e.detail.token, e.detail.url));
 
     // Kick off initial status + table sync after DOM settles
