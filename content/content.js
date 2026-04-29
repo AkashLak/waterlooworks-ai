@@ -262,29 +262,44 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         }
     });
 
-    // ── Direct scrape token listeners (events from MAIN world interceptor) ──
-    document.addEventListener('__wwai_listing', (e) => {
-        if (_directListingToken) return; // capture once per page load
-        _directListingToken = e.detail.token;
-        _directListingUrl   = e.detail.url;
+    // ── Direct scrape token listeners ─────────────────────────────────────────
+    // Tokens are stored in DOM data attributes by the MAIN world interceptor.
+    // We read them on init (handles tokens captured before document_idle) AND
+    // listen for future events (handles tokens captured after init).
+
+    function _onListingToken(token, url) {
+        if (_directListingToken) return; // only use the first capture
+        _directListingToken = token;
+        _directListingUrl   = url;
         if (_directScrapeState === 0) {
             _directScrapeState = 1;
-            // Short delay so WaterlooWorks finishes its own init XHRs first
-            setTimeout(_runDirectScrapePhase1, 2000);
+            setTimeout(_runDirectScrapePhase1, 500);
         }
-    });
+    }
 
-    document.addEventListener('__wwai_detail_post', (e) => {
-        if (!_directDetailTokens.includes(e.detail.token)) {
-            _directDetailTokens.push(e.detail.token);
-        }
-        if (!_directDetailUrl) _directDetailUrl = e.detail.url;
-        // If Phase 1 finished but we were blocked waiting for a detail token, start Phase 2 now
+    function _onDetailToken(token, url) {
+        if (!_directDetailTokens.includes(token)) _directDetailTokens.push(token);
+        if (!_directDetailUrl && url) _directDetailUrl = url;
         if (_directScrapeState === 2) {
             _directScrapeState = 3;
             _runDirectScrapePhase2();
         }
-    });
+    }
+
+    // Read tokens already written to DOM before document_idle (the common case)
+    const _root = document.documentElement;
+    if (_root.dataset.wwaiListingToken && _root.dataset.wwaiListingUrl) {
+        _onListingToken(_root.dataset.wwaiListingToken, _root.dataset.wwaiListingUrl);
+    }
+    if (_root.dataset.wwaiDetailTokens) {
+        for (const t of _root.dataset.wwaiDetailTokens.split('\n').filter(Boolean)) {
+            _onDetailToken(t, _root.dataset.wwaiDetailUrl);
+        }
+    }
+
+    // Also listen for tokens captured after init (e.g. detail token from first job click)
+    document.addEventListener('__wwai_listing',     (e) => _onListingToken(e.detail.token, e.detail.url));
+    document.addEventListener('__wwai_detail_post', (e) => _onDetailToken(e.detail.token, e.detail.url));
 
     // Kick off initial status + table sync after DOM settles
     _refreshStatus();

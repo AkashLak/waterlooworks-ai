@@ -15,6 +15,19 @@
     const WW_BOARD_RE = /\/(jobs|applications)\.htm/;
 
     function _dispatch(type, detail) {
+        // Persist to DOM data attributes — readable by isolated world even after the event fires.
+        // Both worlds share the same DOM, so dataset writes in MAIN are visible in isolated.
+        const root = document.documentElement;
+        if (type === 'listing') {
+            root.dataset.wwaiListingToken = detail.token;
+            root.dataset.wwaiListingUrl   = detail.url;
+        } else if (type === 'detail_post') {
+            const prev   = root.dataset.wwaiDetailTokens ? root.dataset.wwaiDetailTokens.split('\n') : [];
+            const merged = [...new Set([...prev, detail.token])];
+            root.dataset.wwaiDetailTokens = merged.join('\n');
+            root.dataset.wwaiDetailUrl    = detail.url;
+        }
+        // Also fire an event for listeners that are already registered
         document.dispatchEvent(new CustomEvent('__wwai_' + type, {
             detail: JSON.parse(JSON.stringify(detail)),
         }));
