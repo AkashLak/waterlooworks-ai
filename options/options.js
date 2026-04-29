@@ -163,9 +163,6 @@ const DEFAULT_CRITERIA = [
     'Technical Stack',
     'Learning Opportunity',
     'Real Ownership',
-    'Career Growth',
-    'Work-Life Balance',
-    'Impact',
 ];
 
 let _currentCriteria = [...DEFAULT_CRITERIA];

@@ -81,7 +81,7 @@ function _fillDreamJob(card, d) {
     const isStretch = d.isStretch ?? false;
 
     let verdict, color;
-    if (isDream)        { verdict = '⭐ Yes — pursue this!';    color = '#16a34a'; }
+    if (isDream)        { verdict = '⭐ Yes — pursue this!';       color = '#16a34a'; }
     else if (isStretch) { verdict = '🔭 Big stretch — try anyway'; color = '#b45309'; }
     else                { verdict = '❌ Not the right fit for you'; color = '#888'; }
 
@@ -90,10 +90,6 @@ function _fillDreamJob(card, d) {
     v.style.fontSize = '16px';
     v.style.color = color;
     if (d.reason) _el(card, 'p', 'wwai-verdict', d.reason);
-    if (d.attainabilityNote) {
-        _label(card, 'Attainability');
-        _el(card, 'p', 'wwai-verdict', d.attainabilityNote);
-    }
     if (d.highlightInApplication) {
         _label(card, 'What to highlight');
         _tagList(card, [d.highlightInApplication], 'warn');
@@ -117,6 +113,9 @@ function _fillQaSniff(card, d) {
 }
 
 function _fillRoleExplainer(card, d) {
+    if (typeof d === 'string') {
+        try { d = JSON.parse(d); } catch { /* fall through to plain-text fallback */ }
+    }
     const sections = [
         { key: 'dayToDay', label: 'Day-to-Day' },
         { key: 'team',     label: 'Team & Environment' },
