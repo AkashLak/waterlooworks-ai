@@ -161,22 +161,32 @@ function _scheduleTableSync() {
     setTimeout(_onTableChange, 1_500);
 }
 
+function _qaHasAlternateTitles(qa) {
+    if (!qa) return false;
+    return Array.isArray(qa.alternativeTitles) && qa.alternativeTitles.length > 0;
+}
+
+function _showSniffFlag(qa) {
+    const flag = document.getElementById('wwai-sniff-flag');
+    if (flag) flag.textContent = '💡 Also known as ▾';
+    _show('wwai-sniff-flag');
+    const detailEl = document.getElementById('wwai-sniff-detail');
+    if (detailEl && !detailEl.innerHTML.trim()) {
+        const card = document.createElement('div');
+        card.className = 'wwai-result';
+        _fillQaSniff(card, qa);
+        detailEl.appendChild(card);
+    }
+}
+
 function _renderAnalysesReady() {
-    // Show sniff flag if QA analysis flagged this job — collapsed by default, expands on click
+    // Show sniff flag whenever alternate titles exist — collapsed by default, expands on click
     // Fall back to the allJobsMap snapshot if the analyses response didn't include qa_disguise
     const qa = _currentAnalyses?.qa_disguise
             ?? _allJobsMap[_currentJobId]?.qa_disguise
             ?? null;
-    if (qa && (qa.isMismatch ?? qa.isDisguised ?? (qa.titleMatchesRole === false))) {
-        _show('wwai-sniff-flag');
-        const detailEl = document.getElementById('wwai-sniff-detail');
-        if (detailEl) {
-            detailEl.innerHTML = '';
-            const card = document.createElement('div');
-            card.className = 'wwai-result';
-            _fillQaSniff(card, qa);
-            detailEl.appendChild(card);
-        }
+    if (_qaHasAlternateTitles(qa)) {
+        _showSniffFlag(qa);
     }
 
     // Show first dayToDay bullet as a one-line role preview
@@ -241,17 +251,7 @@ async function _onTableChange() {
             const flag = document.getElementById('wwai-sniff-flag');
             if (flag && flag.classList.contains('wwai-hidden')) {
                 const qa = _allJobsMap[_currentJobId]?.qa_disguise ?? null;
-                if (qa && (qa.isMismatch ?? qa.isDisguised ?? (qa.titleMatchesRole === false))) {
-                    flag.textContent = '💡 This role also fits other titles ▾';
-                    _show('wwai-sniff-flag');
-                    const detailEl = document.getElementById('wwai-sniff-detail');
-                    if (detailEl && !detailEl.innerHTML.trim()) {
-                        const card = document.createElement('div');
-                        card.className = 'wwai-result';
-                        _fillQaSniff(card, qa);
-                        detailEl.appendChild(card);
-                    }
-                }
+                if (_qaHasAlternateTitles(qa)) _showSniffFlag(qa);
             }
         }
 

@@ -97,19 +97,8 @@ function _fillDreamJob(card, d) {
 }
 
 function _fillQaSniff(card, d) {
-    _label(card, 'Role Analysis');
-    const mismatch = d.isMismatch ?? d.isDisguised ?? (d.titleMatchesRole === false);
-    if (!mismatch) {
-        const v = _el(card, 'div', 'wwai-score', '✓ Title matches the role');
-        v.style.fontSize = '15px';
-        v.style.color = '#22c55e';
-    }
-    if (d.summary) _el(card, 'p', 'wwai-verdict', d.summary);
-    if (d.alternativeTitles?.length) { _label(card, 'This role also fits'); _tagList(card, d.alternativeTitles, 'warn'); }
+    if (d.alternativeTitles?.length) { _label(card, 'Also known as'); _tagList(card, d.alternativeTitles, 'warn'); }
     if (d.keyResponsibilities?.length) { _label(card, 'Key responsibilities'); _tagList(card, d.keyResponsibilities, 'green'); }
-    // Backward compat with old format
-    if (d.redFlags?.length)       { _label(card, 'Notes');               _tagList(card, d.redFlags, 'red'); }
-    if (d.alsoGoodFitFor?.length) { _label(card, 'Also a good fit for'); _tagList(card, d.alsoGoodFitFor, 'warn'); }
 }
 
 function _fillRoleExplainer(card, d) {
@@ -189,13 +178,12 @@ function _fillSearchResults(card, data) {
 
 function _fillShouldIApply(card, { fit, dream, qa }) {
     const score      = fit?.fitScore ?? 0;
-    const suspicious = qa ? (qa.isMismatch ?? qa.isDisguised ?? (qa.titleMatchesRole === false) ?? false) : false;
-    const isDream    = dream?.isDream ?? dream?.isDreamJob ?? false;
+    const isDream = dream?.isDream ?? dream?.isDreamJob ?? false;
 
     let rec, tier;
-    if      (score >= 70 && !suspicious) { rec = '✅ Yes — Apply';               tier = 'great'; }
-    else if (score >= 40 || isDream)     { rec = '🤔 Maybe — Worth Considering';  tier = 'decent'; }
-    else                                 { rec = '❌ Likely Not a Match';          tier = 'poor'; }
+    if      (score >= 70) { rec = '✅ Yes — Apply';               tier = 'great'; }
+    else if (score >= 40 || isDream) { rec = '🤔 Maybe — Worth Considering';  tier = 'decent'; }
+    else                  { rec = '❌ Likely Not a Match';          tier = 'poor'; }
 
     _label(card, 'Should I Apply?');
     const v = _el(card, 'div', 'wwai-score', rec);
@@ -204,7 +192,6 @@ function _fillShouldIApply(card, { fit, dream, qa }) {
     const fill = _el(bar,  'div', `wwai-score__fill wwai-score__fill--${tier}`);
     fill.style.width = `${score}%`;
     if (fit?.verdict) _el(card, 'p', 'wwai-verdict', `Fit ${score}/100 — ${fit.verdict}`);
-    if (suspicious)   _el(card, 'p', 'wwai-verdict', '💡 This role may also fit other job titles.');
     if (isDream && dream?.highlightInApplication) {
         _label(card, 'What to highlight');
         _tagList(card, [dream.highlightInApplication], 'warn');
@@ -262,7 +249,7 @@ function _injectPrecomputedBadges(rows, jobsMap) {
                    ?? (job ? (job.fitScore ?? job.fit_score ?? null) : null);
         if (score == null) continue; // no score yet — don't show ❓ passively
         const qa = job ? (job.qa_disguise || job.qaResult) : null;
-        const isQa = qa ? (qa.isDisguised ?? !qa.titleMatchesRole ?? false) : false;
+        const isQa = qa ? (Array.isArray(qa.alternativeTitles) && qa.alternativeTitles.length > 0) : false;
         _injectBadge(row, score, isQa);
     }
 }

@@ -99,10 +99,10 @@ function _wireEvents(panel) {
         const open   = !detail.classList.contains('wwai-hidden');
         if (open) {
             _hide('wwai-sniff-detail');
-            flag.textContent = '💡 This role also fits other titles ▾';
+            flag.textContent = flag.textContent.replace('▴', '▾');
         } else {
             _show('wwai-sniff-detail');
-            flag.textContent = '💡 This role also fits other titles ▴';
+            flag.textContent = flag.textContent.replace('▾', '▴');
         }
     });
 
@@ -175,7 +175,7 @@ function _onJobOpen(detail) {
     _hide('wwai-sniff-flag');
     _hide('wwai-sniff-detail');
     document.getElementById('wwai-sniff-detail').innerHTML = '';
-    document.getElementById('wwai-sniff-flag').textContent = '💡 This role also fits other titles ▾';
+    document.getElementById('wwai-sniff-flag').textContent = '💡 Also known as ▾';
     _hide('wwai-role-preview');
 
     // Skip submit if this job was already submitted in this session (modal class flicker guard)
