@@ -209,6 +209,16 @@ async function _onTableChange() {
             const id = job.jobId ?? job.id;
             if (id) jobsMap[id] = job;
         }
+        // Clear stale session cache for jobs the backend no longer has a record of.
+        // Prevents old scores from a wiped DB from showing as badges.
+        for (const row of rows) {
+            if (row.jobId && !jobsMap[row.jobId]) {
+                ['BEST_FIT', 'BATCH_FIT', 'DREAM_JOB', 'QA_SNIFF', 'ROLE_EXPLAINER'].forEach(mode =>
+                    sessionStorage.removeItem(_cacheKey(row.jobId, mode))
+                );
+            }
+        }
+
         _injectPrecomputedBadges(rows, jobsMap);
         _refreshStatus();
     } catch (_) {}
