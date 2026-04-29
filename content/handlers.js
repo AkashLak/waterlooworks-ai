@@ -327,24 +327,23 @@ async function _handleShouldIApply() {
     finally { _clearLoading(); }
 }
 
+const SEARCH_EMPTY_MESSAGES = {
+    closing_soon: 'No upcoming deadlines — your analyzed jobs may have all closed for this cycle.',
+    top_fits:     'No fit scores yet — open some jobs to score them first.',
+};
+
 async function _handleFreeSearch(query) {
     _clearTableFilter();
     _setLoading(`Searching "${query}"…`); _clearResult();
     try {
-        const result = await WWAnalyzer.searchJobs({ criteria: 'free_search', query, limit: 10 });
+        const result = await WWAnalyzer.searchJobs({ criteria: 'free_search', query, limit: 20 });
         const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
-        const data = { jobs, message: result.message, type: 'free_search' };
-        _lastSearchResult = data;
-        _lastSearchQuery  = query;
-        _renderResult('SEARCH_RESULTS', data);
+        const jobIds = jobs.map(j => String(j.jobId ?? j.id)).filter(Boolean);
+        const { shown } = _filterTable(jobIds, query);
+        _renderFilterCard(shown, jobIds.length, query);
     } catch (err) { _renderError(err); }
     finally { _clearLoading(); }
 }
-
-const SEARCH_EMPTY_MESSAGES = {
-    closing_soon: 'No upcoming deadlines — your analyzed jobs may have all closed for this cycle.',
-    top_fits:     'No fit scores yet — click 📋 Score All Jobs to rank everything at once, or use 📊 Analyze Fit on individual jobs.',
-};
 
 async function _handleSearch(searchType) {
     _clearTableFilter();
@@ -353,11 +352,11 @@ async function _handleSearch(searchType) {
     try {
         const result = await WWAnalyzer.searchJobs({ criteria: searchType, limit: searchType === 'top_fits' ? 5 : 20 });
         const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
-        const message = SEARCH_EMPTY_MESSAGES[searchType] ?? result.message ?? null;
-        const data = { jobs, message, type: searchType };
-        _lastSearchResult = data;
-        _lastSearchQuery  = null; // predefined search — no query to restore to input
-        _renderResult('SEARCH_RESULTS', data);
+        const jobIds = jobs.map(j => String(j.jobId ?? j.id)).filter(Boolean);
+        const label   = SEARCH_LABELS[searchType] ?? searchType;
+        const emptyMsg = SEARCH_EMPTY_MESSAGES[searchType] ?? null;
+        const { shown } = _filterTable(jobIds, label, emptyMsg);
+        _renderFilterCard(shown, jobIds.length, label, emptyMsg);
     } catch (err) {
         _renderError(err);
     } finally {
@@ -506,7 +505,7 @@ function _tallyStat(stats, score) {
 
 // ── DOM table filtering (similar roles) ────────────────────────────────────────
 
-function _filterTable(jobIds) {
+function _filterTable(jobIds, label = '', emptyMsg = null) {
     const idSet = new Set(jobIds.map(String));
     _activeFilter = idSet;
     const allRows = WWScaper.scrapeAllListingRows();
@@ -522,7 +521,7 @@ function _filterTable(jobIds) {
             hidden++;
         }
     }
-    _filterMeta = { shown, total: jobIds.length, hidden };
+    _filterMeta = { shown, total: jobIds.length, hidden, query: label, emptyMsg };
     return { shown, hidden };
 }
 
@@ -532,15 +531,16 @@ function _clearTableFilter() {
     document.querySelectorAll('tr.table__row--body').forEach(tr => { tr.style.display = ''; });
 }
 
-function _renderFilterCard(shown, total, query) {
+function _renderFilterCard(shown, total, query, emptyMsg) {
     const container = document.getElementById('wwai-result');
     container.innerHTML = '';
     container.classList.remove('wwai-hidden');
     const card = document.createElement('div');
     card.className = 'wwai-result';
+    const noMatch = emptyMsg ?? `No matches on this page for "${query}" — try navigating to other pages.`;
     const msg = shown > 0
-        ? `Showing ${shown} match${shown !== 1 ? 'es' : ''} on this page for "${query}"${total > shown ? ` · ${total - shown} more in other pages` : ''}.`
-        : `No matches on this page for "${query}" — try navigating to other pages.`;
+        ? `Showing ${shown} match${shown !== 1 ? 'es' : ''} for "${query}"${total > shown ? ` · ${total - shown} on other pages` : ''}.`
+        : noMatch;
     const p = document.createElement('p');
     p.className = 'wwai-verdict';
     p.textContent = msg;
@@ -550,28 +550,12 @@ function _renderFilterCard(shown, total, query) {
     btn.textContent = 'Clear Filter';
     btn.addEventListener('click', () => {
         _clearTableFilter();
-        _lastSearchResult = null;
         _clearResult();
         _show('wwai-empty');
     });
     card.appendChild(p);
     card.appendChild(btn);
     container.appendChild(card);
-}
-
-async function _handleSimilarRoles(query) {
-    _clearTableFilter();
-    _setLoading(`Finding similar roles…`); _clearResult();
-    try {
-        const result = await WWAnalyzer.searchJobs({ criteria: 'similar_roles', query, limit: 20 });
-        const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
-        const jobIds = jobs.map(j => String(j.jobId ?? j.id)).filter(Boolean);
-        const { shown } = _filterTable(jobIds);
-        _renderFilterCard(shown, jobIds.length, query);
-        _lastSearchResult = { _filterCard: true, shown, total: jobIds.length, query };
-        _lastSearchQuery  = null;
-    } catch (err) { _renderError(err); }
-    finally { _clearLoading(); }
 }
 
 // ── Report ─────────────────────────────────────────────────────────────────────

@@ -12,8 +12,6 @@ let _currentDetail     = null;
 let _currentAnalyses   = null; // pre-computed analyses from submitJob / polling
 let _batchRunning      = false;
 let _lastSubmittedJobId = null; // dedup guard — prevents double-submit on modal class flicker
-let _lastSearchResult  = null; // last search data — restored when a job modal closes
-let _lastSearchQuery   = null; // free-text query — restores input field on job close
 let _activeFilter      = null; // Set of jobIds when table filter is active, null otherwise
 let _filterMeta        = null; // { shown, total, query } for filter card restoration
 let _lastRenderedMode  = null; // last rendered result mode — used by report feature
@@ -59,23 +57,17 @@ function _buildPanel() {
                 <button class="wwai-ask__btn" id="wwai-ask-btn">Ask</button>
             </div>
             <hr class="wwai-divider">
-            <div class="wwai-legend">🟢 ≥ 70 &nbsp;🟡 ≥ 40 &nbsp;🔴 &lt; 40 &nbsp;— badges appear as you browse</div>
-            <hr class="wwai-divider">
             <div class="wwai-suggestions" id="wwai-suggestions">
                 <div class="wwai-suggestions__title">Smart Suggestions</div>
                 <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="closing_soon">⏰ Closing Soon</button>
                 <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="top_fits">🎯 Top 5 Fits for Me</button>
                 <div class="wwai-search-bar">
                     <input class="wwai-search-bar__input" id="wwai-search-input" type="text"
-                        placeholder="Search jobs… e.g. remote, Toronto, data science">
+                        placeholder="Search &amp; filter… e.g. remote, Toronto &gt; 8 months">
                     <button class="wwai-btn wwai-btn--full" id="wwai-search-btn">🔍 Search</button>
                 </div>
-                <div class="wwai-search-bar">
-                    <input class="wwai-search-bar__input" id="wwai-roles-input" type="text"
-                        placeholder="Filter page by role… e.g. Data Science, PM">
-                    <button class="wwai-btn wwai-btn--full" id="wwai-roles-btn">🗂 Filter</button>
-                </div>
                 <div class="wwai-status-line" id="wwai-status-line"></div>
+                <div class="wwai-legend-hint">Badges: 🟢 ≥ 70 &nbsp;🟡 ≥ 40 &nbsp;🔴 &lt; 40</div>
             </div>
         </div>
         <div class="wwai-footer">WaterlooWorks AI — free to use &nbsp;·&nbsp; <button id="wwai-report-btn" class="wwai-footer__report">⚑ Report issue</button></div>`;
@@ -117,11 +109,6 @@ function _wireEvents(panel) {
     const searchGo = () => { const q = searchInput.value.trim(); if (q) _handleFreeSearch(q); };
     document.getElementById('wwai-search-btn').addEventListener('click', searchGo);
     searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchGo(); });
-
-    const rolesInput = document.getElementById('wwai-roles-input');
-    const rolesGo = () => { const q = rolesInput.value.trim(); if (q) _handleSimilarRoles(q); };
-    document.getElementById('wwai-roles-btn').addEventListener('click', rolesGo);
-    rolesInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') rolesGo(); });
 
     document.getElementById('wwai-report-btn').addEventListener('click', _handleReport);
 
@@ -215,14 +202,7 @@ function _onJobClose() {
     if (_activeFilter && _filterMeta) {
         // Restore filter status card — table is still filtered in DOM
         _hide('wwai-empty');
-        _renderFilterCard(_filterMeta.shown, _filterMeta.total, _filterMeta.query);
-    } else if (_lastSearchResult) {
-        _hide('wwai-empty');
-        _renderResult('SEARCH_RESULTS', _lastSearchResult);
-        if (_lastSearchQuery) {
-            const input = document.getElementById('wwai-search-input');
-            if (input) input.value = _lastSearchQuery;
-        }
+        _renderFilterCard(_filterMeta.shown, _filterMeta.total, _filterMeta.query, _filterMeta.emptyMsg);
     } else {
         _show('wwai-empty');
     }

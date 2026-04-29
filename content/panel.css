@@ -243,6 +243,12 @@
     text-align: center;
     padding-top: 4px;
 }
+.wwai-legend-hint {
+    font-size: 10px;
+    color: #ccc;
+    text-align: center;
+    padding-top: 2px;
+}
 
 /* ── Search bar ────────────────────────────────────────────────────────────── */
 
