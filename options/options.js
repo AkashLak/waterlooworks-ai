@@ -171,10 +171,12 @@ let _currentCriteria = [...DEFAULT_CRITERIA];
     const stored = await new Promise(r =>
         chrome.storage.local.get('ww_dream_criteria', d => r(d.ww_dream_criteria))
     );
-    // Filter stored list to only valid current criteria, preserving user's order
+    // Preserve user's order for recognized criteria; append any new defaults they haven't seen yet
     const validSet = new Set(DEFAULT_CRITERIA);
     const filtered = Array.isArray(stored) ? stored.filter(c => validSet.has(c)) : [];
-    _currentCriteria = filtered.length ? filtered : [...DEFAULT_CRITERIA];
+    const filteredSet = new Set(filtered);
+    const newDefaults = DEFAULT_CRITERIA.filter(c => !filteredSet.has(c));
+    _currentCriteria = filtered.length ? [...filtered, ...newDefaults] : [...DEFAULT_CRITERIA];
     // Persist the cleaned-up list so stale items don't reappear
     if (JSON.stringify(_currentCriteria) !== JSON.stringify(stored)) {
         _saveCriteria(_currentCriteria);
