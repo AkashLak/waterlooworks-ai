@@ -161,8 +161,8 @@ function _setResumeCheck(done) {
 const DEFAULT_CRITERIA = [
     'Company Prestige',
     'Technical Stack',
-    'Learning Opportunity',
-    'Real Ownership',
+    'Learning Opportunities',
+    'Ownership & Impact',
 ];
 
 let _currentCriteria = [...DEFAULT_CRITERIA];
