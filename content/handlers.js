@@ -49,7 +49,8 @@ async function _submitAndPoll(detail) {
     const jobData = {
         ...fresh,
         location:              row.location     || fresh.location    || '',
-        city:                  row.city         || fresh.city        || '',
+        city:                  row.city         || fresh.jobCity     || fresh.city        || '',
+        country:               fresh.jobCountry || '',
         openings:              parseInt(rawOpenings, 10) || null,
         term:                  row.term         || fresh.term        || '',
         deadline:              row.appDeadline  || fresh.appDeadline || null,
@@ -669,7 +670,8 @@ async function _runDirectScrapePhase2() {
                     const jobData = {
                         ...detail,
                         location:              row.location    || detail.location    || '',
-                        city:                  row.city        || detail.city        || '',
+                        city:                  row.city        || detail.jobCity     || detail.city     || '',
+                        country:               detail.jobCountry || '',
                         openings:              (row.openings ?? parseInt(detail.openings, 10)) || null,
                         term:                  row.term        || detail.term        || '',
                         deadline:              row.appDeadline || detail.appDeadline || null,
@@ -782,9 +784,15 @@ function _renderFilterCard(shown, total, query, emptyMsg) {
 
 async function _handleReport() {
     try {
+        const jobInput = _currentJobId ? {
+            jobId:    _currentJobId,
+            title:    document.getElementById('wwai-job-title')?.textContent ?? null,
+            employer: document.getElementById('wwai-job-meta')?.textContent?.split(' · ')[0] ?? null,
+            mode:     _lastRenderedMode ?? null,
+        } : null;
         await WWAnalyzer.createReport(
             _lastRenderedMode ?? 'unknown',
-            null,
+            jobInput,
             _lastRenderedData ?? null,
             null,
         );
