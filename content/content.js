@@ -83,6 +83,25 @@ function _buildPanel() {
                 <div class="wwai-legend-hint">Badges: 🟢 ≥ 70 &nbsp;🟡 ≥ 40 &nbsp;🔴 &lt; 40</div>
             </div>
         </div>
+        <div class="wwai-report-form wwai-hidden" id="wwai-report-form">
+            <div class="wwai-report-form__title">Report an issue</div>
+            <select class="wwai-report-form__select" id="wwai-report-feature">
+                <option value="should_apply">Should I Apply?</option>
+                <option value="dream_job">Dream Job</option>
+                <option value="explain_role">Explain Role</option>
+                <option value="ask">Ask a Question</option>
+                <option value="free_search">Free Search</option>
+                <option value="closing_soon">Closing Soon</option>
+                <option value="top_fits">Top 5 Fits</option>
+                <option value="badges">Score / Badges</option>
+                <option value="other">Other</option>
+            </select>
+            <textarea class="wwai-report-note" id="wwai-report-note" rows="2" placeholder="What went wrong?"></textarea>
+            <div class="wwai-report-form__actions">
+                <button class="wwai-btn" id="wwai-report-cancel">Cancel</button>
+                <button class="wwai-btn wwai-btn--primary" id="wwai-report-submit">Submit</button>
+            </div>
+        </div>
         <div class="wwai-footer">WaterlooWorks AI — free to use &nbsp;·&nbsp; <button id="wwai-report-btn" class="wwai-footer__report">⚑ Report issue</button></div>`;
     return panel;
 }
@@ -125,6 +144,36 @@ function _wireEvents(panel) {
 
     document.getElementById('wwai-report-btn').addEventListener('click', _handleReport);
 
+    document.getElementById('wwai-report-cancel').addEventListener('click', () => {
+        _hide('wwai-report-form');
+    });
+
+    document.getElementById('wwai-report-submit').addEventListener('click', async () => {
+        const submitBtn = document.getElementById('wwai-report-submit');
+        const feature   = document.getElementById('wwai-report-feature').value;
+        const note      = document.getElementById('wwai-report-note').value.trim() || null;
+        submitBtn.disabled    = true;
+        submitBtn.textContent = 'Sending…';
+        const jobInput = _currentJobId ? {
+            jobId:    _currentJobId,
+            title:    document.getElementById('wwai-job-title')?.textContent ?? null,
+            employer: document.getElementById('wwai-job-meta')?.textContent?.split(' · ')[0] ?? null,
+            mode:     _lastRenderedMode ?? null,
+        } : null;
+        try {
+            await WWAnalyzer.createReport(feature, jobInput, _lastRenderedData ?? null, note);
+            submitBtn.textContent = '✓ Reported!';
+            setTimeout(() => {
+                _hide('wwai-report-form');
+                submitBtn.disabled    = false;
+                submitBtn.textContent = 'Submit';
+                document.getElementById('wwai-report-note').value = '';
+            }, 1500);
+        } catch (_) {
+            submitBtn.textContent = 'Failed — try again';
+            submitBtn.disabled    = false;
+        }
+    });
 }
 
 // ── Panel open / close ─────────────────────────────────────────────────────────

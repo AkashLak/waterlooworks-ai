@@ -910,62 +910,20 @@ function _renderFilterCard(shown, total, query, emptyMsg) {
 
 // ── Report ─────────────────────────────────────────────────────────────────────
 
+const _MODE_TO_FEATURE = {
+    SHOULD_APPLY:  'should_apply',
+    DREAM_JOB:     'dream_job',
+    ROLE_EXPLAINER:'explain_role',
+    ASK:           'ask',
+    BEST_FIT:      'badges',
+    SEARCH_RESULTS:'free_search',
+};
+
 function _handleReport() {
-    // Show an inline note form so the user can describe what went wrong.
-    const container = document.getElementById('wwai-result');
-    container.innerHTML = '';
-    container.classList.remove('wwai-hidden');
-
-    const card = document.createElement('div');
-    card.className = 'wwai-result';
-
-    _label(card, 'Report an issue');
-
-    const textarea = document.createElement('textarea');
-    textarea.className = 'wwai-report-note';
-    textarea.placeholder = 'What went wrong? (optional)';
-    textarea.rows = 3;
-    card.appendChild(textarea);
-
-    const submitBtn = _el(card, 'button', 'wwai-btn wwai-btn--full', 'Submit Report');
-    submitBtn.style.marginTop = '8px';
-    const cancelBtn = _el(card, 'button', 'wwai-btn wwai-btn--full', 'Cancel');
-    cancelBtn.style.marginTop = '4px';
-
-    cancelBtn.addEventListener('click', () => {
-        container.innerHTML = '';
-        container.classList.add('wwai-hidden');
-        _show('wwai-empty');
-    });
-
-    submitBtn.addEventListener('click', async () => {
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Sending…';
-        const note = textarea.value.trim() || null;
-        const jobInput = _currentJobId ? {
-            jobId:    _currentJobId,
-            title:    document.getElementById('wwai-job-title')?.textContent ?? null,
-            employer: document.getElementById('wwai-job-meta')?.textContent?.split(' · ')[0] ?? null,
-            mode:     _lastRenderedMode ?? null,
-        } : null;
-        try {
-            await WWAnalyzer.createReport(
-                _lastRenderedMode ?? 'unknown',
-                jobInput,
-                _lastRenderedData ?? null,
-                note,
-            );
-            submitBtn.textContent = '✓ Reported!';
-            setTimeout(() => {
-                container.innerHTML = '';
-                container.classList.add('wwai-hidden');
-                _show('wwai-empty');
-            }, 1500);
-        } catch (_) {
-            submitBtn.textContent = 'Failed — try again';
-            submitBtn.disabled = false;
-        }
-    });
-
-    container.appendChild(card);
+    // Pre-select the feature dropdown based on the last rendered mode if known
+    const select = document.getElementById('wwai-report-feature');
+    select.value = (_lastRenderedMode && _MODE_TO_FEATURE[_lastRenderedMode])
+        ? _MODE_TO_FEATURE[_lastRenderedMode]
+        : 'other';
+    _show('wwai-report-form');
 }
