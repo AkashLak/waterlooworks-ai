@@ -656,7 +656,11 @@ async function _runDirectScrapePhase2() {
         const jobs = response.jobs ?? (Array.isArray(response) ? response : []);
         for (const job of jobs) {
             const id = String(job.jobId ?? job.id ?? '');
-            if (id && (job.job_summary || job.job_responsibilities)) describedIds.add(id);
+            // Only skip if description AND location fields are already populated.
+            // Jobs with a description but null city/country still need a re-fetch.
+            if (id && (job.job_summary || job.job_responsibilities) && job.city && job.country) {
+                describedIds.add(id);
+            }
         }
     } catch (_) {}
 
