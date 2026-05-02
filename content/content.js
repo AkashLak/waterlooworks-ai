@@ -150,7 +150,8 @@ function _wireEvents(panel) {
 
     document.getElementById('wwai-report-submit').addEventListener('click', async () => {
         const submitBtn = document.getElementById('wwai-report-submit');
-        const feature   = document.getElementById('wwai-report-feature').value;
+        const featureEl = document.getElementById('wwai-report-feature');
+        const feature   = featureEl.options[featureEl.selectedIndex].text;
         const note      = document.getElementById('wwai-report-note').value.trim() || null;
         submitBtn.disabled    = true;
         submitBtn.textContent = 'Sending…';
