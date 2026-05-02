@@ -743,6 +743,9 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                     );
                     if (!detail) return;
 
+                    // Temporary debug — log all scraped keys and city/country for every job
+                    console.log('[WWAI] job', row.jobId, '| city:', detail.city, '| country:', detail.country, '| all keys:', Object.keys(detail).join(', '));
+
                     // Fetch geo data in parallel — city/country come from WW's separate geo endpoint
                     const geo = await _fetchGeoData(row.jobId);
 
