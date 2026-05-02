@@ -682,7 +682,6 @@ async function _runDirectScrapePhase2() {
     } catch (_) {}
 
     const rowsToFetch = rows.filter(r => !describedIds.has(String(r.jobId)));
-    console.log('[WWAI] Phase2: total rows:', rows.length, '| already described:', describedIds.size, '| to fetch:', rowsToFetch.length, '| ids:', rowsToFetch.map(r => r.jobId).join(', '));
 
     if (!rowsToFetch.length) {
         _directScrapeState = 4;
@@ -737,18 +736,12 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                     if (!res) return;
 
                     const html = await res.text();
-                    if (!html.includes('tag__key-value-list')) {
-                        console.log('[WWAI] job', row.jobId, '— no tag__key-value-list in response, preview:', html.slice(0, 200));
-                        return;
-                    }
+                    if (!html.includes('tag__key-value-list')) return;
 
                     const detail = WWScaper.scrapeJobDetailFromHtml(
                         html, row.jobId, row.title, row.employer, row.division
                     );
                     if (!detail) return;
-
-                    // Temporary debug — log all scraped keys and city/country for every job
-                    console.log('[WWAI] job', row.jobId, '| city:', detail.city, '| country:', detail.country, '| all keys:', Object.keys(detail).join(', '));
 
                     // Fetch geo data in parallel — city/country come from WW's separate geo endpoint
                     const geo = await _fetchGeoData(row.jobId);
@@ -799,23 +792,19 @@ async function _findHtmlDetailToken(sampleRow) {
         });
         if (!res) continue;
         const text = await res.text();
-        console.log('[WWAI] token:', token, '| isHTML:', text.includes('tag__key-value-list'), '| preview:', text.slice(0, 300));
         if (text.includes('tag__key-value-list')) {
             htmlToken = token;
         } else {
             try {
                 const geo = JSON.parse(text);
-                console.log('[WWAI] geo JSON parsed:', JSON.stringify(geo).slice(0, 500));
                 if (geo && (geo.city !== undefined || geo.country !== undefined || geo.data)) {
                     _directGeoToken = token;
                 }
-            } catch (_) {
-                console.log('[WWAI] token response is neither HTML nor JSON');
-            }
+            } catch (_) {}
+
         }
     }
 
-    console.log('[WWAI] htmlToken:', htmlToken, '| geoToken:', _directGeoToken);
     return htmlToken;
 }
 
