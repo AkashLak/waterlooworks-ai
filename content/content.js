@@ -85,6 +85,7 @@ function _buildPanel() {
         </div>
         <div class="wwai-report-form wwai-hidden" id="wwai-report-form">
             <div class="wwai-report-form__title">Report an issue</div>
+            <textarea class="wwai-report-note" id="wwai-report-note" rows="2" placeholder="What went wrong?"></textarea>
             <select class="wwai-report-form__select" id="wwai-report-feature">
                 <option value="should_apply">Should I Apply?</option>
                 <option value="dream_job">Dream Job</option>
@@ -96,7 +97,6 @@ function _buildPanel() {
                 <option value="badges">Score / Badges</option>
                 <option value="other">Other</option>
             </select>
-            <textarea class="wwai-report-note" id="wwai-report-note" rows="2" placeholder="What went wrong?"></textarea>
             <div class="wwai-report-form__actions">
                 <button class="wwai-btn" id="wwai-report-cancel">Cancel</button>
                 <button class="wwai-btn wwai-btn--primary" id="wwai-report-submit">Submit</button>
@@ -145,6 +145,7 @@ function _wireEvents(panel) {
     document.getElementById('wwai-report-btn').addEventListener('click', _handleReport);
 
     document.getElementById('wwai-report-cancel').addEventListener('click', () => {
+        document.getElementById('wwai-report-feature').blur();
         _hide('wwai-report-form');
     });
 
@@ -164,6 +165,7 @@ function _wireEvents(panel) {
         try {
             await WWAnalyzer.createReport(feature, jobInput, _lastRenderedData ?? null, note);
             submitBtn.textContent = '✓ Reported!';
+            document.getElementById('wwai-report-feature').blur();
             setTimeout(() => {
                 _hide('wwai-report-form');
                 submitBtn.disabled    = false;

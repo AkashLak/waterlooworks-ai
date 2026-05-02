@@ -217,12 +217,6 @@
 .wwai-report-form__title {
     font-size: 12px; font-weight: 600; color: #555; margin-bottom: 6px;
 }
-.wwai-report-form__select {
-    width: 100%; padding: 6px 8px; border: 1.5px solid #e0e0e0; border-radius: 6px;
-    font-size: 12px; font-family: inherit; outline: none; background: #fff;
-    margin-bottom: 6px; transition: border-color 0.12s;
-}
-.wwai-report-form__select:focus { border-color: #FFC72C; }
 .wwai-report-note {
     width: 100%; box-sizing: border-box; padding: 7px 10px;
     border: 1.5px solid #e0e0e0; border-radius: 6px; font-size: 12px;
@@ -230,6 +224,12 @@
     transition: border-color 0.12s; margin-bottom: 6px;
 }
 .wwai-report-note:focus { border-color: #FFC72C; }
+.wwai-report-form__select {
+    width: 100%; padding: 6px 8px; border: 1.5px solid #e0e0e0; border-radius: 6px;
+    font-size: 12px; font-family: inherit; outline: none; background: #fff;
+    margin-bottom: 6px; transition: border-color 0.12s;
+}
+.wwai-report-form__select:focus { border-color: #FFC72C; }
 .wwai-report-form__actions {
     display: flex; gap: 6px; justify-content: flex-end;
 }
