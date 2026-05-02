@@ -911,19 +911,20 @@ function _renderFilterCard(shown, total, query, emptyMsg) {
 // ── Report ─────────────────────────────────────────────────────────────────────
 
 const _MODE_TO_FEATURE = {
-    SHOULD_APPLY:  'should_apply',
-    DREAM_JOB:     'dream_job',
-    ROLE_EXPLAINER:'explain_role',
-    ASK:           'ask',
-    BEST_FIT:      'badges',
-    SEARCH_RESULTS:'free_search',
+    SHOULD_APPLY:  'Should I Apply?',
+    DREAM_JOB:     'Dream Job',
+    ROLE_EXPLAINER:'Explain Role',
+    ASK:           'Ask a Question',
+    BEST_FIT:      'Score / Badges',
+    SEARCH_RESULTS:'Free Search',
 };
 
 function _handleReport() {
-    // Pre-select the feature dropdown based on the last rendered mode if known
-    const select = document.getElementById('wwai-report-feature');
-    select.value = (_lastRenderedMode && _MODE_TO_FEATURE[_lastRenderedMode])
+    const target = (_lastRenderedMode && _MODE_TO_FEATURE[_lastRenderedMode])
         ? _MODE_TO_FEATURE[_lastRenderedMode]
-        : 'other';
+        : null;
+    document.querySelectorAll('.wwai-report-feature-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.feature === target);
+    });
     _show('wwai-report-form');
 }

@@ -85,18 +85,18 @@ function _buildPanel() {
         </div>
         <div class="wwai-report-form wwai-hidden" id="wwai-report-form">
             <div class="wwai-report-form__title">Report an issue</div>
+            <div class="wwai-report-features" id="wwai-report-features">
+                <button class="wwai-report-feature-btn" data-feature="Should I Apply?">Should I Apply?</button>
+                <button class="wwai-report-feature-btn" data-feature="Dream Job">Dream Job</button>
+                <button class="wwai-report-feature-btn" data-feature="Explain Role">Explain Role</button>
+                <button class="wwai-report-feature-btn" data-feature="Ask a Question">Ask a Question</button>
+                <button class="wwai-report-feature-btn" data-feature="Free Search">Free Search</button>
+                <button class="wwai-report-feature-btn" data-feature="Closing Soon">Closing Soon</button>
+                <button class="wwai-report-feature-btn" data-feature="Top 5 Fits">Top 5 Fits</button>
+                <button class="wwai-report-feature-btn" data-feature="Score / Badges">Score / Badges</button>
+                <button class="wwai-report-feature-btn" data-feature="Other">Other</button>
+            </div>
             <textarea class="wwai-report-note" id="wwai-report-note" rows="2" placeholder="What went wrong?"></textarea>
-            <select class="wwai-report-form__select" id="wwai-report-feature">
-                <option value="should_apply">Should I Apply?</option>
-                <option value="dream_job">Dream Job</option>
-                <option value="explain_role">Explain Role</option>
-                <option value="ask">Ask a Question</option>
-                <option value="free_search">Free Search</option>
-                <option value="closing_soon">Closing Soon</option>
-                <option value="top_fits">Top 5 Fits</option>
-                <option value="badges">Score / Badges</option>
-                <option value="other">Other</option>
-            </select>
             <div class="wwai-report-form__actions">
                 <button class="wwai-btn" id="wwai-report-cancel">Cancel</button>
                 <button class="wwai-btn wwai-btn--primary" id="wwai-report-submit">Submit</button>
@@ -144,16 +144,23 @@ function _wireEvents(panel) {
 
     document.getElementById('wwai-report-btn').addEventListener('click', _handleReport);
 
+    document.getElementById('wwai-report-features').addEventListener('click', (e) => {
+        const btn = e.target.closest('.wwai-report-feature-btn');
+        if (!btn) return;
+        document.querySelectorAll('.wwai-report-feature-btn')
+            .forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    });
+
     document.getElementById('wwai-report-cancel').addEventListener('click', () => {
-        document.getElementById('wwai-report-feature').blur();
         _hide('wwai-report-form');
     });
 
     document.getElementById('wwai-report-submit').addEventListener('click', async () => {
-        const submitBtn = document.getElementById('wwai-report-submit');
-        const featureEl = document.getElementById('wwai-report-feature');
-        const feature   = featureEl.options[featureEl.selectedIndex].text;
-        const note      = document.getElementById('wwai-report-note').value.trim() || null;
+        const submitBtn  = document.getElementById('wwai-report-submit');
+        const activeBtn  = document.querySelector('.wwai-report-feature-btn.active');
+        const feature    = activeBtn?.dataset.feature ?? 'Other';
+        const note       = document.getElementById('wwai-report-note').value.trim() || null;
         submitBtn.disabled    = true;
         submitBtn.textContent = 'Sending…';
         const jobInput = _currentJobId ? {
@@ -165,7 +172,6 @@ function _wireEvents(panel) {
         try {
             await WWAnalyzer.createReport(feature, jobInput, _lastRenderedData ?? null, note);
             submitBtn.textContent = '✓ Reported!';
-            document.getElementById('wwai-report-feature').blur();
             setTimeout(() => {
                 _hide('wwai-report-form');
                 submitBtn.disabled    = false;
