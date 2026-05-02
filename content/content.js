@@ -26,6 +26,7 @@ let _directDetailUrl       = null; // URL used for job detail POSTs
 let _directScrapeRows      = null; // rows collected in Phase 1; grows as new rows appear
 let _directScrapeState     = 0;    // 0=idle 1=phase1 2=awaiting_detail_token 3=phase2 4=done
 let _directHtmlDetailToken = null; // the specific POST token that returns job HTML (cached after Phase 2 finds it)
+let _directGeoToken        = null; // the POST token that returns geo JSON (city, country) — cached after Phase 2
 let _directDetailBase      = null; // resolved absolute URL for detail POSTs (cached after Phase 2)
 let _lastKnownTotal        = 0;    // totalResults from the last listing fetch — used to detect new postings
 let _periodicCheckTimer    = null; // setInterval handle for the background new-job check

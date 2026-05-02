@@ -13,16 +13,33 @@ let _pollCount = 0;
  * Waits until the open modal has populated its content fields, or timeoutMs elapses.
  * WaterlooWorks opens the modal shell before fetching job detail via an internal API.
  */
-function _waitForModalContent(timeoutMs = 2500) {
+function _waitForModalContent(timeoutMs = 5000) {
     const modal = WWScaper.getActiveModal();
     if (!modal) return Promise.resolve();
-    if (modal.querySelector('.tag__key-value-list p')?.textContent?.trim()) return Promise.resolve();
+
+    // WaterlooWorks loads geo fields (country, job location) in a secondary XHR
+    // that fires 200-400ms after the initial content. We debounce 800ms after
+    // the last DOM mutation so all secondary responses have time to render.
+    const SETTLE_MS = 800;
+
     return new Promise((resolve) => {
-        const timer = setTimeout(() => { observer.disconnect(); resolve(); }, timeoutMs);
+        let settleTimer = null;
+        const done = () => { clearTimeout(hardTimer); observer.disconnect(); resolve(); };
+        const hardTimer = setTimeout(done, timeoutMs);
+
+        const bump = () => {
+            clearTimeout(settleTimer);
+            settleTimer = setTimeout(done, SETTLE_MS);
+        };
+
+        // If content is already present, start the settle timer immediately
+        if (modal.querySelector('.tag__key-value-list p')?.textContent?.trim()) {
+            bump();
+            return;
+        }
+
         const observer = new MutationObserver(() => {
-            if (modal.querySelector('.tag__key-value-list p')?.textContent?.trim()) {
-                clearTimeout(timer); observer.disconnect(); resolve();
-            }
+            if (modal.querySelector('.tag__key-value-list p')?.textContent?.trim()) bump();
         });
         observer.observe(modal, { subtree: true, childList: true });
     });
@@ -726,11 +743,14 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                     );
                     if (!detail) return;
 
+                    // Fetch geo data in parallel — city/country come from WW's separate geo endpoint
+                    const geo = await _fetchGeoData(row.jobId);
+
                     const jobData = {
                         ...detail,
                         location:              row.location    || detail.location    || '',
-                        city:                  row.city        || detail.city        || '',
-                        country:               detail.country  || '',
+                        city:                  row.city        || geo.city           || detail.city    || '',
+                        country:               geo.country     || detail.country     || '',
                         openings:              (row.openings ?? parseInt(detail.openings, 10)) || null,
                         term:                  row.term        || detail.term        || '',
                         deadline:              row.appDeadline || detail.appDeadline || null,
@@ -754,12 +774,14 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
 }
 
 async function _findHtmlDetailToken(sampleRow) {
-    // Try each captured POST token on a single job; return the one that produces HTML with job fields.
-    // The geo-data token returns JSON; the job-detail token returns HTML — we want the latter.
-    // _directDetailUrl may be a relative path — resolve against page origin.
+    // Try each captured POST token on a single job.
+    // One token returns HTML (job fields) — that's the HTML token.
+    // Another returns JSON with geo data (city, country) — cache that too.
     const detailUrl = _directDetailUrl
         ? new URL(_directDetailUrl, window.location.origin).href
         : `${window.location.origin}/myAccount/co-op/direct/jobs.htm`;
+
+    let htmlToken = null;
 
     for (const token of _directDetailTokens) {
         const body = `action=${encodeURIComponent(token)}&postingId=${encodeURIComponent(sampleRow.jobId)}`;
@@ -770,9 +792,43 @@ async function _findHtmlDetailToken(sampleRow) {
         });
         if (!res) continue;
         const text = await res.text();
-        if (text.includes('tag__key-value-list')) return token;
+        if (text.includes('tag__key-value-list')) {
+            htmlToken = token;
+        } else {
+            // Check if this is the geo JSON token
+            try {
+                const geo = JSON.parse(text);
+                if (geo && (geo.city !== undefined || geo.country !== undefined || geo.data)) {
+                    _directGeoToken = token;
+                }
+            } catch (_) {}
+        }
     }
-    return null;
+
+    return htmlToken;
+}
+
+// Fetches geo data (city, country) for a single job using the cached geo token.
+// Returns { city, country } or {} if geo token unavailable or response unrecognised.
+async function _fetchGeoData(jobId) {
+    if (!_directGeoToken || !_directDetailBase) return {};
+    try {
+        const body = `action=${encodeURIComponent(_directGeoToken)}&postingId=${encodeURIComponent(jobId)}`;
+        const res  = await _directFetch(_directDetailBase, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body,
+        });
+        if (!res) return {};
+        const text = await res.text();
+        const geo  = JSON.parse(text);
+        // WW geo response shape varies — look for city/country at top level or nested
+        const city    = geo.city    ?? geo.location ?? geo.data?.city    ?? null;
+        const country = geo.country ?? geo.data?.country ?? null;
+        return { city: city || null, country: country || null };
+    } catch (_) {
+        return {};
+    }
 }
 
 // ── Periodic new-job detection ─────────────────────────────────────────────────
