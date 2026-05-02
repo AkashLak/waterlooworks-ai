@@ -17,14 +17,19 @@ function _waitForModalContent(timeoutMs = 5000) {
     const modal = WWScaper.getActiveModal();
     if (!modal) return Promise.resolve();
 
-    // WaterlooWorks loads geo fields (country, job location) in a secondary XHR
-    // that fires 200-400ms after the initial content. We debounce 800ms after
-    // the last DOM mutation so all secondary responses have time to render.
     const SETTLE_MS = 800;
 
     return new Promise((resolve) => {
         let settleTimer = null;
-        const done = () => { clearTimeout(hardTimer); observer.disconnect(); resolve(); };
+        let observer    = null; // declared before done() so observer?.disconnect() is always safe
+
+        const done = () => {
+            clearTimeout(hardTimer);
+            clearTimeout(settleTimer);
+            observer?.disconnect();
+            resolve();
+        };
+
         const hardTimer = setTimeout(done, timeoutMs);
 
         const bump = () => {
@@ -32,14 +37,19 @@ function _waitForModalContent(timeoutMs = 5000) {
             settleTimer = setTimeout(done, SETTLE_MS);
         };
 
-        // If content is already present, start the settle timer immediately
         if (modal.querySelector('.tag__key-value-list p')?.textContent?.trim()) {
-            bump();
+            bump(); // content already present — settle timer only, no observer needed
             return;
         }
 
-        const observer = new MutationObserver(() => {
-            if (modal.querySelector('.tag__key-value-list p')?.textContent?.trim()) bump();
+        observer = new MutationObserver(() => {
+            if (modal.querySelector('.tag__key-value-list p')?.textContent?.trim()) {
+                // Disconnect immediately — prevents map tile mutations from
+                // continuously resetting the settle timer
+                observer.disconnect();
+                observer = null;
+                bump();
+            }
         });
         observer.observe(modal, { subtree: true, childList: true });
     });
