@@ -19,12 +19,16 @@ let _lastRenderedData  = null; // last rendered result data — used by report f
 let _allJobsMap        = {};   // latest getAllJobs snapshot — fallback for qa_disguise in panel
 
 // ── Direct HTTP scrape state (populated by MAIN world interceptor) ─────────────
-let _directListingToken = null; // action token from WaterlooWorks's own listing GET
-let _directListingUrl   = null; // full captured URL — reused as pagination template
-let _directDetailTokens = [];   // all captured POST action tokens (HTML token is typically last)
-let _directDetailUrl    = null; // URL used for job detail POSTs
-let _directScrapeRows   = null; // rows collected in Phase 1; reused by Phase 2
-let _directScrapeState  = 0;    // 0=idle 1=phase1 2=awaiting_detail_token 3=phase2 4=done
+let _directListingToken    = null; // action token from WaterlooWorks's own listing GET
+let _directListingUrl      = null; // full captured URL — reused as pagination template
+let _directDetailTokens    = [];   // all captured POST action tokens (HTML token is typically last)
+let _directDetailUrl       = null; // URL used for job detail POSTs
+let _directScrapeRows      = null; // rows collected in Phase 1; grows as new rows appear
+let _directScrapeState     = 0;    // 0=idle 1=phase1 2=awaiting_detail_token 3=phase2 4=done
+let _directHtmlDetailToken = null; // the specific POST token that returns job HTML (cached after Phase 2 finds it)
+let _directDetailBase      = null; // resolved absolute URL for detail POSTs (cached after Phase 2)
+let _lastKnownTotal        = 0;    // totalResults from the last listing fetch — used to detect new postings
+let _periodicCheckTimer    = null; // setInterval handle for the background new-job check
 
 // ── Panel HTML ─────────────────────────────────────────────────────────────────
 

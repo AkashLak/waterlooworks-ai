@@ -49,8 +49,8 @@ async function _submitAndPoll(detail) {
     const jobData = {
         ...fresh,
         location:              row.location     || fresh.location    || '',
-        city:                  row.city         || fresh.jobCity     || fresh.city        || '',
-        country:               fresh.jobCountry || '',
+        city:                  row.city    || fresh.city    || '',
+        country:               fresh.country || '',
         openings:              parseInt(rawOpenings, 10) || null,
         term:                  row.term         || fresh.term        || '',
         deadline:              row.appDeadline  || fresh.appDeadline || null,
@@ -232,6 +232,23 @@ async function _onTableChange() {
     // Strip titleEl (DOM node) before sending — it's only needed for batch click()
     const rowData = rows.map(({ titleEl, ...rest }) => rest).filter(r => r.jobId);
     if (!rowData.length) return;
+
+    // Detect rows that appeared after Phase 1 ran (new postings, pagination, etc.)
+    if (_directScrapeRows) {
+        const knownIds = new Set(_directScrapeRows.map(r => r.jobId));
+        const newRows  = rowData.filter(r => !knownIds.has(r.jobId));
+        if (newRows.length) {
+            _directScrapeRows = [..._directScrapeRows, ...newRows];
+            if (_directScrapeState === 4 && _directHtmlDetailToken) {
+                // Phase 2 already ran — scrape new rows immediately using the cached token
+                _fetchAndSubmitDescriptions(newRows, `Loading ${newRows.length} new job description${newRows.length !== 1 ? 's' : ''}`)
+                    .then(() => { _refreshStatus(); _scheduleTableSync(); })
+                    .catch(() => {});
+            }
+            // If state === 2 (awaiting first click), the new rows are now in _directScrapeRows
+            // and will be included automatically when Phase 2 triggers on the next click.
+        }
+    }
 
     try {
         await WWAnalyzer.syncActiveJobs(rowData);
@@ -606,13 +623,18 @@ async function _runDirectScrapePhase1() {
         return;
     }
 
-    _directScrapeRows = allRows;
+    _directScrapeRows  = allRows;
+    _lastKnownTotal    = allRows.length;
 
     // Sync row-level metadata to backend immediately (no descriptions yet)
     const syncPayload = allRows.map(({ boardUrl, ...r }) => r);
     try { await WWAnalyzer.syncActiveJobs(syncPayload); } catch (_) {}
 
     _scheduleTableSync(); // refresh badge injection with newly synced rows
+
+    // Start background check for new postings — one API call every 5 min while WW is open
+    if (_periodicCheckTimer) clearInterval(_periodicCheckTimer);
+    _periodicCheckTimer = setInterval(_runPeriodicNewJobCheck, 5 * 60 * 1000);
 
     if (_directDetailTokens.length > 0) {
         _directScrapeState = 3;
@@ -627,32 +649,65 @@ async function _runDirectScrapePhase2() {
     const rows = _directScrapeRows;
     if (!rows?.length || !_directDetailTokens.length) return;
 
-    // Find which captured token returns job detail HTML (not the JSON geo-data token)
-    const htmlToken = await _findHtmlDetailToken(rows[0]);
-    if (!htmlToken) {
+    // Ask the DB which jobs already have descriptions — skip those, only fetch new ones
+    let describedIds = new Set();
+    try {
+        const response = await WWAnalyzer.getAllJobs();
+        const jobs = response.jobs ?? (Array.isArray(response) ? response : []);
+        for (const job of jobs) {
+            const id = String(job.jobId ?? job.id ?? '');
+            if (id && (job.job_summary || job.job_responsibilities)) describedIds.add(id);
+        }
+    } catch (_) {}
+
+    const rowsToFetch = rows.filter(r => !describedIds.has(String(r.jobId)));
+
+    if (!rowsToFetch.length) {
         _directScrapeState = 4;
-        _updateStatusLine(`${rows.length} jobs synced`);
+        _updateStatusLine(`${rows.length} jobs already loaded`);
         await _refreshStatus();
         return;
     }
 
-    // Resolve detail URL — _directDetailUrl may be a relative path
-    const detailBase = _directDetailUrl
+    // Find which captured token returns job detail HTML (not the JSON geo-data token)
+    const htmlToken = await _findHtmlDetailToken(rowsToFetch[0]);
+    if (!htmlToken) {
+        _directScrapeState = 4;
+        _updateStatusLine(`${describedIds.size} jobs loaded`);
+        await _refreshStatus();
+        return;
+    }
+
+    // Cache token and resolved base URL — _onTableChange uses these for new rows later
+    _directHtmlDetailToken = htmlToken;
+    _directDetailBase = _directDetailUrl
         ? new URL(_directDetailUrl, window.location.origin).href
         : `${window.location.origin}/myAccount/co-op/direct/jobs.htm`;
 
-    _updateStatusLine(`Loading ${rows.length} job descriptions…`);
+    const label = describedIds.size > 0
+        ? `Loading ${rowsToFetch.length} new job description${rowsToFetch.length !== 1 ? 's' : ''}`
+        : `Loading ${rowsToFetch.length} job description${rowsToFetch.length !== 1 ? 's' : ''}`;
+    await _fetchAndSubmitDescriptions(rowsToFetch, label);
 
+    _directScrapeState = 4;
+    await _refreshStatus();
+    _scheduleTableSync();
+}
+
+// Fetches and submits descriptions for a given set of rows using the cached HTML token.
+// Called by Phase 2 on initial load and by _onTableChange for any new rows that appear later.
+async function _fetchAndSubmitDescriptions(rows, statusLabel) {
     let completed = 0;
+    const total = rows.length;
+    _updateStatusLine(`${statusLabel}…`);
 
-    for (let i = 0; i < rows.length; i += _SCRAPE_CONCURRENCY) {
+    for (let i = 0; i < total; i += _SCRAPE_CONCURRENCY) {
         await Promise.all(
             rows.slice(i, i + _SCRAPE_CONCURRENCY).map(async (row) => {
                 if (!row.jobId) return;
                 try {
-                    const detailUrl = detailBase;
-                    const body = `action=${encodeURIComponent(htmlToken)}&postingId=${encodeURIComponent(row.jobId)}`;
-                    const res  = await _directFetch(detailUrl, {
+                    const body = `action=${encodeURIComponent(_directHtmlDetailToken)}&postingId=${encodeURIComponent(row.jobId)}`;
+                    const res  = await _directFetch(_directDetailBase, {
                         method:  'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body,
@@ -670,8 +725,8 @@ async function _runDirectScrapePhase2() {
                     const jobData = {
                         ...detail,
                         location:              row.location    || detail.location    || '',
-                        city:                  row.city        || detail.jobCity     || detail.city     || '',
-                        country:               detail.jobCountry || '',
+                        city:                  row.city        || detail.city        || '',
+                        country:               detail.country  || '',
                         openings:              (row.openings ?? parseInt(detail.openings, 10)) || null,
                         term:                  row.term        || detail.term        || '',
                         deadline:              row.appDeadline || detail.appDeadline || null,
@@ -686,15 +741,12 @@ async function _runDirectScrapePhase2() {
                 } catch (_) {}
             })
         );
-        if (i + _SCRAPE_CONCURRENCY < rows.length) {
-            _updateStatusLine(`Loading descriptions… ${completed}/${rows.length}`);
+        if (i + _SCRAPE_CONCURRENCY < total) {
+            _updateStatusLine(`${statusLabel}… ${completed}/${total}`);
         }
     }
 
-    _directScrapeState = 4;
     _updateStatusLine(`${completed} jobs ready`);
-    await _refreshStatus();
-    _scheduleTableSync();
 }
 
 async function _findHtmlDetailToken(sampleRow) {
@@ -717,6 +769,82 @@ async function _findHtmlDetailToken(sampleRow) {
         if (text.includes('tag__key-value-list')) return token;
     }
     return null;
+}
+
+// ── Periodic new-job detection ─────────────────────────────────────────────────
+//
+// Runs every 5 minutes while WaterlooWorks is open.
+// Strategy: fetch page 1 of the listing to read totalResults.
+// If totalResults > _lastKnownTotal, new jobs exist — scan pages until
+// we've collected exactly that many new job IDs, then sync + fetch descriptions.
+// On most ticks nothing changed: 1 API call, returns immediately.
+
+async function _runPeriodicNewJobCheck() {
+    if (!_directListingToken || !_directListingUrl) return;
+    if (_directScrapeState < 4) return; // Phase 2 still running — skip this tick
+
+    try {
+        const template = new URL(_directListingUrl);
+        template.searchParams.set('itemsPerPage', '100');
+        template.searchParams.set('page', '1');
+
+        const res = await _directFetch(template.toString());
+        if (!res) return;
+
+        let json;
+        try { json = await res.json(); } catch { return; }
+
+        const currentTotal = json.totalResults ?? 0;
+        if (currentTotal <= _lastKnownTotal) return; // nothing new
+
+        const newCount = currentTotal - _lastKnownTotal;
+        const knownIds = new Set((_directScrapeRows ?? []).map(r => r.jobId));
+        const newRows  = [];
+
+        // Collect new job IDs from page 1 (already fetched) then continue if needed
+        let pageJson = json;
+        let page     = 1;
+        const MAX_PAGES = 60;
+
+        while (newRows.length < newCount && page <= MAX_PAGES) {
+            if (page > 1) {
+                template.searchParams.set('page', String(page));
+                const pageRes = await _directFetch(template.toString());
+                if (!pageRes) break;
+                try { pageJson = await pageRes.json(); } catch { break; }
+            }
+            if (!pageJson.data?.length) break;
+
+            for (const apiRow of pageJson.data) {
+                const row = WWScaper.parseListingRow(apiRow);
+                if (row.jobId && !knownIds.has(row.jobId)) {
+                    newRows.push(row);
+                    knownIds.add(row.jobId);
+                }
+            }
+            page++;
+        }
+
+        _lastKnownTotal = currentTotal;
+        if (!newRows.length) return;
+
+        // Merge into known rows and sync row-level data
+        _directScrapeRows = [...(_directScrapeRows ?? []), ...newRows];
+        const syncPayload = newRows.map(({ boardUrl, ...r }) => r);
+        try { await WWAnalyzer.syncActiveJobs(syncPayload); } catch (_) {}
+
+        // Fetch descriptions automatically if token is cached from Phase 2
+        if (_directHtmlDetailToken && _directDetailBase) {
+            await _fetchAndSubmitDescriptions(
+                newRows,
+                `Loading ${newRows.length} new job description${newRows.length !== 1 ? 's' : ''}`
+            );
+            await _refreshStatus();
+            _scheduleTableSync();
+        } else {
+            _updateStatusLine(`${newRows.length} new job${newRows.length !== 1 ? 's' : ''} found — click any job to load descriptions`);
+        }
+    } catch (_) {}
 }
 
 function _tallyStat(stats, score) {
@@ -782,25 +910,62 @@ function _renderFilterCard(shown, total, query, emptyMsg) {
 
 // ── Report ─────────────────────────────────────────────────────────────────────
 
-async function _handleReport() {
-    try {
+function _handleReport() {
+    // Show an inline note form so the user can describe what went wrong.
+    const container = document.getElementById('wwai-result');
+    container.innerHTML = '';
+    container.classList.remove('wwai-hidden');
+
+    const card = document.createElement('div');
+    card.className = 'wwai-result';
+
+    _label(card, 'Report an issue');
+
+    const textarea = document.createElement('textarea');
+    textarea.className = 'wwai-report-note';
+    textarea.placeholder = 'What went wrong? (optional)';
+    textarea.rows = 3;
+    card.appendChild(textarea);
+
+    const submitBtn = _el(card, 'button', 'wwai-btn wwai-btn--full', 'Submit Report');
+    submitBtn.style.marginTop = '8px';
+    const cancelBtn = _el(card, 'button', 'wwai-btn wwai-btn--full', 'Cancel');
+    cancelBtn.style.marginTop = '4px';
+
+    cancelBtn.addEventListener('click', () => {
+        container.innerHTML = '';
+        container.classList.add('wwai-hidden');
+        _show('wwai-empty');
+    });
+
+    submitBtn.addEventListener('click', async () => {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending…';
+        const note = textarea.value.trim() || null;
         const jobInput = _currentJobId ? {
             jobId:    _currentJobId,
             title:    document.getElementById('wwai-job-title')?.textContent ?? null,
             employer: document.getElementById('wwai-job-meta')?.textContent?.split(' · ')[0] ?? null,
             mode:     _lastRenderedMode ?? null,
         } : null;
-        await WWAnalyzer.createReport(
-            _lastRenderedMode ?? 'unknown',
-            jobInput,
-            _lastRenderedData ?? null,
-            null,
-        );
-        const footer = document.querySelector('.wwai-footer');
-        if (footer) {
-            const btn = document.getElementById('wwai-report-btn');
-            if (btn) { btn.textContent = '✓ Reported!'; btn.disabled = true; }
-            setTimeout(() => { if (btn) { btn.textContent = '⚑ Report issue'; btn.disabled = false; } }, 3000);
+        try {
+            await WWAnalyzer.createReport(
+                _lastRenderedMode ?? 'unknown',
+                jobInput,
+                _lastRenderedData ?? null,
+                note,
+            );
+            submitBtn.textContent = '✓ Reported!';
+            setTimeout(() => {
+                container.innerHTML = '';
+                container.classList.add('wwai-hidden');
+                _show('wwai-empty');
+            }, 1500);
+        } catch (_) {
+            submitBtn.textContent = 'Failed — try again';
+            submitBtn.disabled = false;
         }
-    } catch (_) {}
+    });
+
+    container.appendChild(card);
 }
