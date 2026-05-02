@@ -682,6 +682,7 @@ async function _runDirectScrapePhase2() {
     } catch (_) {}
 
     const rowsToFetch = rows.filter(r => !describedIds.has(String(r.jobId)));
+    console.log('[WWAI] Phase2: total rows:', rows.length, '| already described:', describedIds.size, '| to fetch:', rowsToFetch.length, '| ids:', rowsToFetch.map(r => r.jobId).join(', '));
 
     if (!rowsToFetch.length) {
         _directScrapeState = 4;
@@ -736,7 +737,10 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                     if (!res) return;
 
                     const html = await res.text();
-                    if (!html.includes('tag__key-value-list')) return;
+                    if (!html.includes('tag__key-value-list')) {
+                        console.log('[WWAI] job', row.jobId, '— no tag__key-value-list in response, preview:', html.slice(0, 200));
+                        return;
+                    }
 
                     const detail = WWScaper.scrapeJobDetailFromHtml(
                         html, row.jobId, row.title, row.employer, row.division
