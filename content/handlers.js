@@ -792,19 +792,23 @@ async function _findHtmlDetailToken(sampleRow) {
         });
         if (!res) continue;
         const text = await res.text();
+        console.log('[WWAI] token:', token, '| isHTML:', text.includes('tag__key-value-list'), '| preview:', text.slice(0, 300));
         if (text.includes('tag__key-value-list')) {
             htmlToken = token;
         } else {
-            // Check if this is the geo JSON token
             try {
                 const geo = JSON.parse(text);
+                console.log('[WWAI] geo JSON parsed:', JSON.stringify(geo).slice(0, 500));
                 if (geo && (geo.city !== undefined || geo.country !== undefined || geo.data)) {
                     _directGeoToken = token;
                 }
-            } catch (_) {}
+            } catch (_) {
+                console.log('[WWAI] token response is neither HTML nor JSON');
+            }
         }
     }
 
+    console.log('[WWAI] htmlToken:', htmlToken, '| geoToken:', _directGeoToken);
     return htmlToken;
 }
 
