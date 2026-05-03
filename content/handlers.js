@@ -692,7 +692,6 @@ async function _runDirectScrapePhase2() {
     } catch (_) {}
 
     const rowsToFetch = rows.filter(r => !describedIds.has(String(r.jobId)));
-    console.log('[WWAI] rowsToFetch ids:', rowsToFetch.map(r => r.jobId).join(', '));
 
     if (!rowsToFetch.length) {
         _directScrapeState = 4;
@@ -771,12 +770,9 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                         externalUrl:           _decodeHtml(detail.ifByWebsiteGoTo || detail.ifByEmailSendTo || ''),
                     };
 
-                    console.log('[WWAI] submitting', row.jobId, 'city:', jobData.city, 'country:', jobData.country);
                     await WWAnalyzer.submitJob(jobData);
                     completed++;
-                } catch (err) {
-                    console.log('[WWAI] submit error for', row.jobId, err?.message);
-                }
+                } catch (_) {}
             })
         );
         if (i + _SCRAPE_CONCURRENCY < total) {
