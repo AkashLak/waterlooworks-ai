@@ -435,7 +435,19 @@ async function _handleFreeSearch(query) {
         const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
         const jobIds = jobs.map(j => String(j.jobId ?? j.id)).filter(Boolean);
         const { shown } = _filterTable(jobIds, query);
-        _renderFilterCard(shown, jobIds.length, query);
+
+        let emptyMsg = null;
+        if (!jobIds.length && _directScrapeState < 4) {
+            // Only show the Phase 2 hint when the query is asking for modal-level fields
+            // (work term duration, employment arrangement, skills) that aren't loaded yet.
+            // Row-level searches (company, title, city, country) work without Phase 2.
+            const asksForModalFields = /\b(month|hybrid|remote|in.person|on.?site|arrangement|skill|education|duration|gpa)\b/i.test(query);
+            if (asksForModalFields) {
+                emptyMsg = 'Work term duration, hybrid/remote, and skills details aren\'t loaded yet — click any job title once, then search again.';
+            }
+        }
+
+        _renderFilterCard(shown, jobIds.length, query, emptyMsg);
     } catch (err) { _renderError(err); }
     finally { _clearLoading(); }
 }
