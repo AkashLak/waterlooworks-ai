@@ -4,8 +4,9 @@
 
 const POLL_INTERVAL_MS = 4_000;
 const MAX_POLLS        = 30;
-let _pollTimer = null;
-let _pollCount = 0;
+let _pollTimer  = null;
+let _pollCount  = 0;
+let _overlayEl  = null; // injected overlay for cross-page search results
 
 // ── Job submission and analysis polling ────────────────────────────────────────
 
@@ -310,6 +311,14 @@ async function _onTableChange() {
 
         _injectPrecomputedBadges(rows, jobsMap);
         _refreshStatus();
+
+        // Re-apply active filter to newly rendered rows (e.g. after WW page navigation).
+        // Skip when the overlay is showing — overlay already displays all results; no DOM hiding needed.
+        if (!_overlayEl && _activeFilter && _filterMeta) {
+            const { shown } = _filterTable([..._activeFilter], _filterMeta.query, _filterMeta.emptyMsg);
+            _filterMeta.shown = shown;
+            _renderFilterCard(shown, _filterMeta.total, _filterMeta.query, _filterMeta.emptyMsg);
+        }
     } catch (_) {}
 }
 
@@ -433,21 +442,17 @@ async function _handleFreeSearch(query) {
     try {
         const result = await WWAnalyzer.searchJobs({ criteria: 'free_search', query, limit: 20 });
         const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
-        const jobIds = jobs.map(j => String(j.jobId ?? j.id)).filter(Boolean);
-        const { shown } = _filterTable(jobIds, query);
 
         let emptyMsg = null;
-        if (!jobIds.length && _directScrapeState < 4) {
-            // Only show the Phase 2 hint when the query is asking for modal-level fields
-            // (work term duration, employment arrangement, skills) that aren't loaded yet.
-            // Row-level searches (company, title, city, country) work without Phase 2.
+        if (!jobs.length && _directScrapeState < 4) {
             const asksForModalFields = /\b(month|hybrid|remote|in.person|on.?site|arrangement|skill|education|duration|gpa)\b/i.test(query);
             if (asksForModalFields) {
                 emptyMsg = 'Work term duration, hybrid/remote, and skills details aren\'t loaded yet — click any job title once, then search again.';
             }
         }
 
-        _renderFilterCard(shown, jobIds.length, query, emptyMsg);
+        _showSearchOverlay(jobs, query, emptyMsg);
+        _renderFilterCard(jobs.length, jobs.length, query, emptyMsg);
     } catch (err) { _renderError(err); }
     finally { _clearLoading(); }
 }
@@ -459,11 +464,10 @@ async function _handleSearch(searchType) {
     try {
         const result = await WWAnalyzer.searchJobs({ criteria: searchType, limit: searchType === 'top_fits' ? 5 : 20 });
         const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
-        const jobIds = jobs.map(j => String(j.jobId ?? j.id)).filter(Boolean);
-        const label   = SEARCH_LABELS[searchType] ?? searchType;
+        const label    = SEARCH_LABELS[searchType] ?? searchType;
         const emptyMsg = SEARCH_EMPTY_MESSAGES[searchType] ?? null;
-        const { shown } = _filterTable(jobIds, label, emptyMsg);
-        _renderFilterCard(shown, jobIds.length, label, emptyMsg);
+        _showSearchOverlay(jobs, label, emptyMsg);
+        _renderFilterCard(jobs.length, jobs.length, label, emptyMsg);
     } catch (err) {
         _renderError(err);
     } finally {
@@ -488,6 +492,12 @@ async function _refreshStatus() {
 // ── Batch analysis ─────────────────────────────────────────────────────────────
 
 function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function _formatDate(iso) {
+    try {
+        return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch { return iso; }
+}
 
 function _decodeHtml(str) {
     if (!str) return str;
@@ -935,7 +945,127 @@ function _tallyStat(stats, score) {
     else stats.poor++;
 }
 
-// ── DOM table filtering (similar roles) ────────────────────────────────────────
+// ── Cross-page search overlay ──────────────────────────────────────────────────
+//
+// Shows ALL backend search results (every WW page) in a full-page table overlaid
+// on WaterlooWorks.  Clicking a job title opens WW's native modal for that job:
+//   • job is in the current DOM table → find the <a> and click it directly
+//   • job is on another page → dispatch __wwai_open_job to the MAIN world,
+//     which calls WW's viewPosting() to load the modal without page navigation
+
+function _showSearchOverlay(jobs, query, emptyMsg) {
+    _hideSearchOverlay();
+    _filterMeta = { shown: jobs.length, total: jobs.length, query, emptyMsg: emptyMsg ?? null };
+
+    const overlay = document.createElement('div');
+    overlay.id = 'wwai-search-overlay';
+
+    // ── Header bar ─────────────────────────────────────────────────────────────
+    const bar = document.createElement('div');
+    bar.className = 'wwai-overlay-bar';
+
+    const barTitle = document.createElement('span');
+    barTitle.className = 'wwai-overlay-bar__title';
+    barTitle.textContent = jobs.length
+        ? `${jobs.length} result${jobs.length !== 1 ? 's' : ''} for "${query}"`
+        : `No results for "${query}"`;
+
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'wwai-overlay-bar__clear';
+    clearBtn.textContent = 'Clear filter ✕';
+    clearBtn.addEventListener('click', () => { _clearTableFilter(); _clearResult(); _show('wwai-empty'); });
+
+    bar.appendChild(barTitle);
+    bar.appendChild(clearBtn);
+
+    // ── Body ────────────────────────────────────────────────────────────────────
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'wwai-overlay-body';
+
+    if (!jobs.length) {
+        const emptyEl = document.createElement('p');
+        emptyEl.className = 'wwai-overlay-empty';
+        emptyEl.textContent = emptyMsg ?? `No matching jobs found for "${query}".`;
+        bodyEl.appendChild(emptyEl);
+    } else {
+        const table = document.createElement('table');
+        table.className = 'wwai-overlay-table';
+
+        const thead = document.createElement('thead');
+        const htr = document.createElement('tr');
+        ['Job Title', 'Employer', 'City', 'Term', 'Deadline', 'Fit'].forEach(label => {
+            const th = document.createElement('th');
+            th.textContent = label;
+            htr.appendChild(th);
+        });
+        thead.appendChild(htr);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        for (const job of jobs) {
+            const jobId = String(job.jobId ?? job.id ?? '');
+            const tr = document.createElement('tr');
+            tr.className = 'wwai-overlay-row';
+
+            const tdTitle = document.createElement('td');
+            const titleBtn = document.createElement('button');
+            titleBtn.className = 'wwai-overlay-title-btn';
+            titleBtn.textContent = job.title ?? '';
+            if (jobId) titleBtn.addEventListener('click', () => _openJobFromOverlay(jobId));
+            tdTitle.appendChild(titleBtn);
+
+            const tdEmp = document.createElement('td');
+            tdEmp.textContent = job.employer ?? job.organization ?? '';
+
+            const tdCity = document.createElement('td');
+            tdCity.textContent = job.city ?? '';
+
+            const tdTerm = document.createElement('td');
+            const rawDur = job.term ?? job.work_term_duration ?? '';
+            tdTerm.textContent = rawDur.replace(/\s*work\s*term\s*/i, '').trim();
+
+            const tdDead = document.createElement('td');
+            const rawDeadline = job.deadline ?? job.app_deadline ?? '';
+            tdDead.textContent = rawDeadline ? _formatDate(rawDeadline) : '';
+
+            const tdFit = document.createElement('td');
+            const cached = _getCached(jobId, 'BATCH_FIT') ?? _getCached(jobId, 'BEST_FIT');
+            const score  = job.fitScore ?? job.fit_score ?? cached?.fitScore ?? cached?.fit_score ?? null;
+            if (score != null) {
+                const badge = document.createElement('span');
+                badge.className = `wwai-overlay-badge wwai-overlay-badge--${score >= 70 ? 'great' : score >= 40 ? 'decent' : 'poor'}`;
+                badge.textContent = String(score);
+                tdFit.appendChild(badge);
+            }
+
+            tr.appendChild(tdTitle); tr.appendChild(tdEmp);  tr.appendChild(tdCity);
+            tr.appendChild(tdTerm);  tr.appendChild(tdDead); tr.appendChild(tdFit);
+            tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+        bodyEl.appendChild(table);
+    }
+
+    overlay.appendChild(bar);
+    overlay.appendChild(bodyEl);
+    document.body.appendChild(overlay);
+    _overlayEl = overlay;
+}
+
+function _hideSearchOverlay() {
+    if (_overlayEl) { _overlayEl.remove(); _overlayEl = null; }
+}
+
+function _openJobFromOverlay(jobId) {
+    if (!jobId) return;
+    // Prefer clicking the live DOM element — guaranteed to trigger WW's modal
+    const domRow = WWScaper.scrapeAllListingRows().find(r => String(r.jobId) === jobId);
+    if (domRow?.titleEl) { domRow.titleEl.click(); return; }
+    // Not on this page — ask the MAIN world to call WW's viewPosting()
+    document.dispatchEvent(new CustomEvent('__wwai_open_job', { detail: { postingId: jobId } }));
+}
+
+// ── DOM table filtering (kept for _onTableChange re-apply when overlay is off) ──
 
 function _filterTable(jobIds, label = '', emptyMsg = null) {
     const idSet = new Set(jobIds.map(String));
@@ -945,13 +1075,8 @@ function _filterTable(jobIds, label = '', emptyMsg = null) {
     for (const row of allRows) {
         const tr = row.titleEl?.closest('tr.table__row--body');
         if (!tr) continue;
-        if (row.jobId && idSet.has(String(row.jobId))) {
-            tr.style.display = '';
-            shown++;
-        } else {
-            tr.style.display = 'none';
-            hidden++;
-        }
+        if (row.jobId && idSet.has(String(row.jobId))) { tr.style.display = ''; shown++; }
+        else                                           { tr.style.display = 'none'; hidden++; }
     }
     _filterMeta = { shown, total: jobIds.length, hidden, query: label, emptyMsg };
     return { shown, hidden };
@@ -960,6 +1085,7 @@ function _filterTable(jobIds, label = '', emptyMsg = null) {
 function _clearTableFilter() {
     _activeFilter = null;
     _filterMeta   = null;
+    _hideSearchOverlay();
     document.querySelectorAll('tr.table__row--body').forEach(tr => { tr.style.display = ''; });
 }
 
@@ -969,9 +1095,9 @@ function _renderFilterCard(shown, total, query, emptyMsg) {
     container.classList.remove('wwai-hidden');
     const card = document.createElement('div');
     card.className = 'wwai-result';
-    const noMatch = emptyMsg ?? `No matches on this page for "${query}" — try navigating to other pages.`;
+    const noMatch = emptyMsg ?? `No matching jobs found for "${query}".`;
     const msg = shown > 0
-        ? `Showing ${shown} match${shown !== 1 ? 'es' : ''} for "${query}"${total > shown ? ` · ${total - shown} on other pages` : ''}.`
+        ? `Showing ${shown} match${shown !== 1 ? 'es' : ''} for "${query}".`
         : noMatch;
     const p = document.createElement('p');
     p.className = 'wwai-verdict';
@@ -980,11 +1106,7 @@ function _renderFilterCard(shown, total, query, emptyMsg) {
     btn.className = 'wwai-btn wwai-btn--full';
     btn.style.marginTop = '8px';
     btn.textContent = 'Clear Filter';
-    btn.addEventListener('click', () => {
-        _clearTableFilter();
-        _clearResult();
-        _show('wwai-empty');
-    });
+    btn.addEventListener('click', () => { _clearTableFilter(); _clearResult(); _show('wwai-empty'); });
     card.appendChild(p);
     card.appendChild(btn);
     container.appendChild(card);

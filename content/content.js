@@ -274,8 +274,8 @@ function _onJobClose() {
     _show('wwai-suggestions');
     _clearResult(); _clearLoading();
 
-    if (_activeFilter && _filterMeta) {
-        // Restore filter status card — table is still filtered in DOM
+    if (_overlayEl || (_activeFilter && _filterMeta)) {
+        // Overlay or DOM filter is still active — restore the panel summary card
         _hide('wwai-empty');
         _renderFilterCard(_filterMeta.shown, _filterMeta.total, _filterMeta.query, _filterMeta.emptyMsg);
     } else {

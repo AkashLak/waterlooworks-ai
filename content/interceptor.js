@@ -89,4 +89,15 @@
         }
         return _origFetch.apply(this, arguments);
     };
+
+    // ── Cross-page job opener ─────────────────────────────────────────────────
+    // The isolated-world overlay dispatches this when the user clicks a job that
+    // is not rendered in the current WaterlooWorks DOM table.  We call WW's own
+    // JS to open the posting modal — same as clicking the title link directly.
+    document.addEventListener('__wwai_open_job', (e) => {
+        const postingId = e.detail?.postingId;
+        if (!postingId) return;
+        if (typeof viewPosting === 'function')  { viewPosting(postingId);  return; }
+        if (typeof loadPosting === 'function')  { loadPosting(postingId);  return; }
+    });
 })();
