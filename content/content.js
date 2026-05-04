@@ -73,8 +73,8 @@ function _buildPanel() {
             <hr class="wwai-divider">
             <div class="wwai-suggestions" id="wwai-suggestions">
                 <div class="wwai-suggestions__title">Smart Suggestions</div>
-                <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="closing_soon">⏰ Closing Soon</button>
-                <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="top_fits">🎯 Top 5 Fits for Me</button>
+                <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="closing_soon">⏰ Closing in 3 Days</button>
+                <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="top_fits">🎯 Top 10 Fits for Me</button>
                 <div class="wwai-search-bar">
                     <input class="wwai-search-bar__input" id="wwai-search-input" type="text"
                         placeholder="Search &amp; filter… e.g. remote, Toronto &gt; 8 months">
@@ -93,7 +93,7 @@ function _buildPanel() {
                 <button class="wwai-report-feature-btn" data-feature="Ask a Question">Ask a Question</button>
                 <button class="wwai-report-feature-btn" data-feature="Free Search">Free Search</button>
                 <button class="wwai-report-feature-btn" data-feature="Closing Soon">Closing Soon</button>
-                <button class="wwai-report-feature-btn" data-feature="Top 5 Fits">Top 5 Fits</button>
+                <button class="wwai-report-feature-btn" data-feature="Top 10 Fits">Top 10 Fits</button>
                 <button class="wwai-report-feature-btn" data-feature="Score / Badges">Score / Badges</button>
                 <button class="wwai-report-feature-btn" data-feature="Other">Other</button>
             </div>

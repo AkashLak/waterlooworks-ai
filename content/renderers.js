@@ -161,11 +161,8 @@ function _fillSearchResults(card, data) {
         _el(card, 'p', 'wwai-verdict', message ?? 'No matching jobs found.');
         return;
     }
-    if (type === 'top_fits' && jobs.length < 5) {
-        _el(card, 'p', 'wwai-verdict', `Showing ${jobs.length} of 5 — click more job titles and run 📋 Score All Jobs to fill out your Top 5.`);
-    }
-    if (type === 'free_search' && jobs.length >= 10) {
-        _el(card, 'p', 'wwai-verdict', 'Showing top 10 — refine your search to narrow down.');
+    if (type === 'top_fits' && jobs.length < 10) {
+        _el(card, 'p', 'wwai-verdict', `Showing ${jobs.length} of 10 — open more job postings and run 📋 Score All Jobs to fill out your Top 10.`);
     }
     for (const job of jobs) {
         const item = _el(card, 'div', 'wwai-search-result');

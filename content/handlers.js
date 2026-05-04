@@ -403,7 +403,7 @@ async function _handleAsk(question) {
 
 // ── Smart Suggestions ──────────────────────────────────────────────────────────
 
-const SEARCH_LABELS = { top_fits: 'Top 5 Fits', closing_soon: 'Closing Soon' };
+const SEARCH_LABELS = { top_fits: 'Top 10 Fits', closing_soon: 'Closing in 3 Days' };
 
 async function _handleShouldIApply() {
     if (!_currentJobId) return;
@@ -432,15 +432,15 @@ async function _handleShouldIApply() {
 }
 
 const SEARCH_EMPTY_MESSAGES = {
-    closing_soon: 'No upcoming deadlines — your analyzed jobs may have all closed for this cycle.',
-    top_fits:     'No fit scores yet — open some jobs to score them first.',
+    closing_soon: 'No jobs closing within 3 days — deadlines may have passed or these jobs haven\'t been analyzed yet.',
+    top_fits:     'No fit scores yet — open some job postings and run Score All Jobs to build your Top 10.',
 };
 
 async function _handleFreeSearch(query) {
     _clearTableFilter();
     _setLoading(`Searching "${query}"…`); _clearResult();
     try {
-        const result = await WWAnalyzer.searchJobs({ criteria: 'free_search', query, limit: 20 });
+        const result = await WWAnalyzer.searchJobs({ criteria: 'free_search', query });
         const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
 
         let emptyMsg = null;
@@ -462,7 +462,7 @@ async function _handleSearch(searchType) {
     _setLoading(`Searching ${SEARCH_LABELS[searchType] ?? searchType}…`);
     _clearResult();
     try {
-        const result = await WWAnalyzer.searchJobs({ criteria: searchType, limit: searchType === 'top_fits' ? 5 : 20 });
+        const result = await WWAnalyzer.searchJobs({ criteria: searchType });
         const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
         const label    = SEARCH_LABELS[searchType] ?? searchType;
         const emptyMsg = SEARCH_EMPTY_MESSAGES[searchType] ?? null;
