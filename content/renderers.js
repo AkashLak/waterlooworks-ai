@@ -214,7 +214,7 @@ function _renderError(err) {
         _el(card, 'p', '', 'Add your resume in Settings to start analyzing.');
         const btn = _el(card, 'button', 'wwai-btn wwai-btn--full', '→ Open Settings');
         btn.style.marginTop = '8px';
-        btn.addEventListener('click', () => chrome.runtime.sendMessage({ action: 'openOptions' }));
+        btn.addEventListener('click', () => chrome.runtime.openOptionsPage());
     } else {
         _el(card, 'p', '', err.message ?? 'An unexpected error occurred. Please try again.');
     }
