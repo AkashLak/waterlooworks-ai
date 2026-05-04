@@ -1058,10 +1058,9 @@ function _hideSearchOverlay() {
 
 function _openJobFromOverlay(jobId) {
     if (!jobId) return;
-    // Prefer clicking the live DOM element — guaranteed to trigger WW's modal
-    const domRow = WWScaper.scrapeAllListingRows().find(r => String(r.jobId) === jobId);
-    if (domRow?.titleEl) { domRow.titleEl.click(); return; }
-    // Not on this page — ask the MAIN world to call WW's viewPosting()
+    // Always dispatch to the MAIN world — WW title links use javascript: hrefs which
+    // Chrome blocks when clicked programmatically from extension context (CSP violation).
+    // viewPosting() called natively from interceptor.js is exempt from that restriction.
     document.dispatchEvent(new CustomEvent('__wwai_open_job', { detail: { postingId: jobId } }));
 }
 
