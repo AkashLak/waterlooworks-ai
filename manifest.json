@@ -21,13 +21,13 @@
 
   "content_scripts": [
     {
-      "matches": ["*://waterlooworks.uwaterloo.ca/*"],
+      "matches": ["*://waterlooworks.uwaterloo.ca/myAccount/co-op/full/jobs.htm*"],
       "js": ["content/interceptor.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": ["*://waterlooworks.uwaterloo.ca/*"],
+      "matches": ["*://waterlooworks.uwaterloo.ca/myAccount/co-op/full/jobs.htm*"],
       "js": [
         "lib/storage.js",
         "lib/scraper.js",

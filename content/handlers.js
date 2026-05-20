@@ -735,7 +735,9 @@ async function _runDirectScrapePhase2() {
     _directHtmlDetailToken = htmlToken;
     _directDetailBase = _directDetailUrl
         ? new URL(_directDetailUrl, window.location.origin).href
-        : `${window.location.origin}/myAccount/co-op/direct/jobs.htm`;
+        : _directListingUrl
+            ? `${new URL(_directListingUrl).origin}${new URL(_directListingUrl).pathname}`
+            : `${window.location.origin}/myAccount/co-op/full/jobs.htm`;
 
     const label = describedIds.size > 0
         ? `Loading ${rowsToFetch.length} new job description${rowsToFetch.length !== 1 ? 's' : ''}`
@@ -811,7 +813,9 @@ async function _findHtmlDetailToken(sampleRow) {
     // Another returns JSON with geo data (city, country) — cache that too.
     const detailUrl = _directDetailUrl
         ? new URL(_directDetailUrl, window.location.origin).href
-        : `${window.location.origin}/myAccount/co-op/direct/jobs.htm`;
+        : _directListingUrl
+            ? `${new URL(_directListingUrl).origin}${new URL(_directListingUrl).pathname}`
+            : `${window.location.origin}/myAccount/co-op/full/jobs.htm`;
 
     let htmlToken = null;
 
