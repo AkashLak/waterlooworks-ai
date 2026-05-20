@@ -84,7 +84,7 @@ async function _submitAndPoll(detail) {
         province:              fresh.province   || '',
         country:               fresh.country    || '',
         openings:              parseInt(rawOpenings, 10) || null,
-        level:                 row.level        || '',
+        level:                 row.level        || fresh.level || '',
         apps:                  row.apps         || null,
         term:                  row.term         || fresh.workTermDuration || fresh.workTerm || fresh.term || '',
         deadline:              row.appDeadline  || fresh.applicationDeadline || fresh.appDeadline || null,
@@ -103,8 +103,10 @@ async function _submitAndPoll(detail) {
 
     if (submitResult.analysesReady && submitResult.analyses) {
         _currentAnalyses = submitResult.analyses;
-        _renderAnalysesReady();
+        _renderAnalysesReady(); // calls _prefetchFitScore internally
     } else {
+        // Job now exists in DB — safe to prefetch fit score without a race condition
+        _prefetchFitScore();
         _setLoading('Analyzing new job…');
         _startPolling(detail.jobId);
     }
@@ -800,7 +802,7 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                         province:              detail.province || '',
                         country:               geo.country     || detail.country     || '',
                         openings:              (row.openings ?? parseInt(detail.numberOfJobOpenings ?? detail.openings, 10)) || null,
-                        level:                 row.level       || '',
+                        level:                 row.level       || detail.level || '',
                         apps:                  row.apps        || null,
                         term:                  row.term        || detail.workTermDuration || detail.workTerm || detail.term || '',
                         deadline:              row.appDeadline || detail.applicationDeadline || detail.appDeadline || null,
