@@ -120,6 +120,7 @@ function _wireEvents(panel) {
         btn.addEventListener('click', () => _handleSearch(btn.dataset.search))
     );
 
+
     const askInput = document.getElementById('wwai-ask-input');
     const submit   = () => { const q = askInput.value.trim(); if (q) _handleAsk(q); };
     document.getElementById('wwai-ask-btn').addEventListener('click', submit);

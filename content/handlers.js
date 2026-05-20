@@ -463,7 +463,16 @@ async function _handleSearch(searchType) {
     _clearResult();
     try {
         const result = await WWAnalyzer.searchJobs({ criteria: searchType });
-        const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
+        let jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
+
+        // Filter to jobs from the current cycle's All Jobs listing.
+        // _directScrapeRows is populated by Phase 1 from the live listing — any job
+        // not in that set belongs to a previous cycle and should not appear here.
+        if (_directScrapeRows?.length) {
+            const currentIds = new Set(_directScrapeRows.map(r => String(r.jobId)));
+            jobs = jobs.filter(j => currentIds.has(String(j.jobId ?? j.id ?? '')));
+        }
+
         const label    = SEARCH_LABELS[searchType] ?? searchType;
         const emptyMsg = SEARCH_EMPTY_MESSAGES[searchType] ?? null;
         _showSearchOverlay(jobs, label, emptyMsg);
