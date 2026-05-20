@@ -73,15 +73,19 @@ async function _submitAndPoll(detail) {
     if (fresh.jobId !== detail.jobId) return;
 
     const row = WWScaper.scrapeRowByJobId(fresh.jobId) ?? {};
-    const rawOpenings = row.openings || fresh.openings || '';
+    // All Jobs modal uses different label text than My Applications:
+    //   "Work Term:" → fresh.workTerm (not fresh.term)
+    //   "Number of Job Openings:" → fresh.numberOfJobOpenings (not fresh.openings)
+    //   "Application Deadline:" → fresh.applicationDeadline (not fresh.appDeadline)
+    const rawOpenings = row.openings || fresh.numberOfJobOpenings || fresh.openings || '';
     const jobData = {
         ...fresh,
         location:              row.location     || fresh.location    || '',
         city:                  row.city    || fresh.city    || '',
         country:               fresh.country || '',
         openings:              parseInt(rawOpenings, 10) || null,
-        term:                  row.term         || fresh.term        || '',
-        deadline:              row.appDeadline  || fresh.appDeadline || null,
+        term:                  row.term         || fresh.workTerm    || fresh.term        || '',
+        deadline:              row.appDeadline  || fresh.applicationDeadline || fresh.appDeadline || null,
         organization:          row.organization || fresh.employer    || '',
         description:           WWScaper.extractJobDescription(fresh) || null,
         // WaterlooWorks label → camelCase key differs from what backend expects
@@ -794,9 +798,9 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                         location:              row.location    || detail.location    || '',
                         city:                  row.city        || geo.city           || detail.city    || '',
                         country:               geo.country     || detail.country     || '',
-                        openings:              (row.openings ?? parseInt(detail.openings, 10)) || null,
-                        term:                  row.term        || detail.term        || '',
-                        deadline:              row.appDeadline || detail.appDeadline || null,
+                        openings:              (row.openings ?? parseInt(detail.numberOfJobOpenings ?? detail.openings, 10)) || null,
+                        term:                  row.term        || detail.workTerm    || detail.term    || '',
+                        deadline:              row.appDeadline || detail.applicationDeadline || detail.appDeadline || null,
                         organization:          row.employer    || detail.employer    || '',
                         description:           WWScaper.extractJobDescription(detail) || null,
                         employmentArrangement: detail.employmentLocationArrangement  || '',
