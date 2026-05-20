@@ -80,15 +80,16 @@ async function _submitAndPoll(detail) {
     const rawOpenings = row.openings || fresh.numberOfJobOpenings || fresh.openings || '';
     const jobData = {
         ...fresh,
-        location:              row.location     || fresh.location    || '',
-        city:                  row.city    || fresh.city    || '',
-        country:               fresh.country || '',
+        city:                  row.city         || fresh.city        || '',
+        province:              fresh.province   || '',
+        country:               fresh.country    || '',
         openings:              parseInt(rawOpenings, 10) || null,
+        level:                 row.level        || '',
+        apps:                  row.apps         || null,
         term:                  row.term         || fresh.workTermDuration || fresh.workTerm || fresh.term || '',
         deadline:              row.appDeadline  || fresh.applicationDeadline || fresh.appDeadline || null,
         organization:          row.organization || fresh.employer    || '',
         description:           WWScaper.extractJobDescription(fresh) || null,
-        // WaterlooWorks label → camelCase key differs from what backend expects
         employmentArrangement: fresh.employmentLocationArrangement   || '',
         externalUrl:           _decodeHtml(fresh.ifByWebsiteGoTo || fresh.ifByEmailSendTo || ''),
     };
@@ -795,10 +796,12 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
 
                     const jobData = {
                         ...detail,
-                        location:              row.location    || detail.location    || '',
                         city:                  row.city        || geo.city           || detail.city    || '',
+                        province:              detail.province || '',
                         country:               geo.country     || detail.country     || '',
                         openings:              (row.openings ?? parseInt(detail.numberOfJobOpenings ?? detail.openings, 10)) || null,
+                        level:                 row.level       || '',
+                        apps:                  row.apps        || null,
                         term:                  row.term        || detail.workTermDuration || detail.workTerm || detail.term || '',
                         deadline:              row.appDeadline || detail.applicationDeadline || detail.appDeadline || null,
                         organization:          row.employer    || detail.employer    || '',
