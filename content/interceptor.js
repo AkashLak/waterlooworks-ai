@@ -86,6 +86,7 @@
             const token   = _extractToken(srcStr);
             if (token) {
                 if (method === 'GET') {
+                    console.log('[WWAI intercept fetch GET]', url.slice(0, 120));
                     _dispatch('listing', { token, url });
                 } else if (method === 'POST') {
                     console.log('[WWAI intercept fetch POST]', url, '| body:', bodyStr.slice(0, 120));

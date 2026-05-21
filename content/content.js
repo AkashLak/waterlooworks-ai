@@ -336,9 +336,10 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         if (_directListingToken) return; // only use the first capture
         _directListingToken = token;
         _directListingUrl   = url;
+        console.log('[WWAI listing] token captured — url:', url, 'state:', _directScrapeState);
         if (_directScrapeState === 0) {
             _directScrapeState = 1;
-            _runDirectScrapePhase1(); // perf entry is already complete — no delay needed
+            _runDirectScrapePhase1();
         }
     }
 
@@ -355,17 +356,22 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         }
     }
 
-    // ── Listing token: read from Performance API ──────────────────────────────
+    // ── Listing token: read from Performance API or interceptor event ─────────────
     // WaterlooWorks fires its own listing GET on page load. By document_idle it's
     // already in the resource timing entries with the full URL + action token.
-    // This is more reliable than XHR interception for the listing request.
+    // The interceptor also dispatches __wwai_listing events (and writes to dataset)
+    // for GETs it captures — we listen to both so neither path is missed.
+    //
+    // NOTE: The first listing GET for Full-Cycle All Jobs does NOT include page= in
+    // the URL (WW omits it on page 1). The old scan required page= which caused
+    // Phase 1 to never start on that board. The requirement is removed here.
 
     function _scanPerfForListingToken() {
         const ACTION_RE = /[?&]action=([^&\s]+)/;
         for (const entry of performance.getEntriesByType('resource')) {
             const url = entry.name;
             if ((url.includes('/jobs.htm') || url.includes('/applications.htm')) &&
-                 /[?&]page=/.test(url) && ACTION_RE.test(url)) {
+                 ACTION_RE.test(url)) {
                 const m = url.match(ACTION_RE);
                 if (m) { _onListingToken(decodeURIComponent(m[1]), url); return true; }
             }
@@ -373,14 +379,20 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         return false;
     }
 
+    // Also read from DOM dataset — the interceptor writes there for GETs captured
+    // before document_idle (which is before the Performance API scan runs).
+    if (_root.dataset.wwaiListingToken && !_directListingToken) {
+        _onListingToken(_root.dataset.wwaiListingToken, _root.dataset.wwaiListingUrl || window.location.href);
+    }
+
     if (!_scanPerfForListingToken()) {
-        // Listing might still be in-flight (unlikely but possible on slow connections)
+        // Listing might still be in-flight (rare on fast connections)
         const _listingObserver = new PerformanceObserver((list) => {
             if (_directListingToken) { _listingObserver.disconnect(); return; }
             for (const entry of list.getEntries()) {
                 const url = entry.name;
                 if ((url.includes('/jobs.htm') || url.includes('/applications.htm')) &&
-                     /[?&]page=/.test(url) && url.includes('action=')) {
+                     url.includes('action=')) {
                     const m = url.match(/[?&]action=([^&\s]+)/);
                     if (m) {
                         _onListingToken(decodeURIComponent(m[1]), url);
@@ -392,6 +404,13 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         });
         _listingObserver.observe({ entryTypes: ['resource'] });
     }
+
+    // Belt-and-suspenders: also listen for the __wwai_listing event that the
+    // interceptor fires. Covers GETs that fire while document_idle is loading.
+    document.addEventListener('__wwai_listing', (e) => {
+        console.log('[WWAI listing] event received — token:', e.detail.token?.slice(0, 30), 'url:', e.detail.url);
+        _onListingToken(e.detail.token, e.detail.url);
+    });
 
     // ── Detail tokens: read from DOM dataset written by MAIN world interceptor ──
     // The interceptor writes detail POST tokens (which contain postingId in the body)
