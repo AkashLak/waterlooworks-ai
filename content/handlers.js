@@ -680,7 +680,9 @@ async function _runDirectScrapePhase1() {
                 console.log('[WWAI P1] candidate not JSON — length:', rawText.length, 'start:', rawText.slice(0, 80));
                 continue;
             }
-            console.log('[WWAI P1] candidate JSON keys:', Object.keys(testJson).slice(0, 6), 'totalResults:', testJson.totalResults, 'data?', Array.isArray(testJson.data));
+            const keys = Object.keys(testJson);
+            const firstVal = keys.length ? testJson[keys[0]] : undefined;
+            console.log('[WWAI P1] candidate JSON keys:', keys.slice(0, 6), 'firstVal:', JSON.stringify(firstVal)?.slice(0, 80), 'totalResults:', testJson.totalResults, 'data?', Array.isArray(testJson.data));
             if (testJson.totalResults !== undefined && Array.isArray(testJson.data)) {
                 _directListingToken  = candidate;
                 _directListingUrl    = baseUrl;
@@ -696,9 +698,7 @@ async function _runDirectScrapePhase1() {
     const domFallbackRows = [];
     if (!_directListingToken) {
         await new Promise(r => setTimeout(r, 300)); // let Vue finish rendering
-        const colMap = WWScaper.scrapeColumnHeaders();
-        for (const tr of document.querySelectorAll('tr.table__row--body')) {
-            const row = WWScaper.scrapeListingRow(tr, colMap);
+        for (const row of WWScaper.scrapeAllListingRows()) {
             if (row.jobId) domFallbackRows.push(row);
         }
         console.log('[WWAI P1] DOM fallback — scraped', domFallbackRows.length, 'visible rows');
