@@ -783,6 +783,33 @@ async function _runDirectScrapePhase1() {
     }
 }
 
+// Fast DOM-only Phase 1 — called when the All Jobs table renders after SPA navigation.
+// Skips HTTP candidate trials; scrapes visible rows immediately, then transitions to Phase 2.
+async function _runDomPhase1() {
+    const rows = WWScaper.scrapeAllListingRows().filter(r => r.jobId);
+    console.log('[WWAI P1 DOM] scraped', rows.length, 'rows from rendered table');
+    if (!rows.length) {
+        _directScrapeState = 0;
+        return;
+    }
+
+    _directScrapeRows = rows;
+    _lastKnownTotal   = rows.length;
+    _updateStatusLine(`${rows.length} jobs synced — click any job once to load descriptions`);
+
+    const syncPayload = rows.map(({ boardUrl, ...r }) => r);
+    try { await WWAnalyzer.syncActiveJobs(syncPayload); } catch (_) {}
+
+    _scheduleTableSync();
+
+    if (_directDetailTokens.length > 0) {
+        _directScrapeState = 3;
+        _runDirectScrapePhase2();
+    } else {
+        _directScrapeState = 2;
+    }
+}
+
 async function _runDirectScrapePhase2() {
     const rows = _directScrapeRows;
     console.log('[WWAI P2] start — rows:', rows?.length, 'tokens:', _directDetailTokens.length, 'state:', _directScrapeState);
@@ -860,17 +887,19 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body,
                     });
-                    if (!res) return;
+                    if (!res) { console.log('[P2 fetch] null res for', row.jobId); return; }
 
                     const html = await res.text();
-                    if (!html.includes('tag__key-value-list')) return;
+                    if (!html.includes('tag__key-value-list')) {
+                        console.log('[P2 fetch] no kv-list for', row.jobId, 'len:', html.length, 'start:', html.slice(0, 60));
+                        return;
+                    }
 
                     const detail = WWScaper.scrapeJobDetailFromHtml(
                         html, row.jobId, row.title, row.employer, row.division
                     );
-                    if (!detail) return;
+                    if (!detail) { console.log('[P2 fetch] scrape null for', row.jobId); return; }
 
-                    // Fetch geo data in parallel — city/country come from WW's separate geo endpoint
                     const geo = await _fetchGeoData(row.jobId);
 
                     const jobData = {
@@ -891,7 +920,8 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
 
                     await WWAnalyzer.submitJob(jobData);
                     completed++;
-                } catch (_) {}
+                    console.log('[P2 fetch] submitted', row.jobId, 'total:', completed);
+                } catch (e) { console.log('[P2 fetch] error for', row.jobId, e?.message); }
             })
         );
         if (i + _SCRAPE_CONCURRENCY < total) {

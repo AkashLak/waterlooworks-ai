@@ -237,7 +237,15 @@ new MutationObserver((mutations) => {
                 (n.matches('tr.table__row--body') || n.querySelector('tr.table__row--body'))
             )
         );
-        if (hasNewRows) _scheduleTableSync();
+        if (hasNewRows) {
+            _scheduleTableSync();
+            // Trigger DOM Phase 1 when the All Jobs table first renders after SPA navigation.
+            // State 0 = Phase 1 hasn't run yet (HTTP listing not captured).
+            if (_directScrapeState === 0 && !_directListingToken) {
+                _directScrapeState = 1;
+                _runDomPhase1();
+            }
+        }
     }
 }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
 
