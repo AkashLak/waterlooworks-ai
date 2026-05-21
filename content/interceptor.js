@@ -7,8 +7,7 @@
  * captured action tokens needed for direct HTTP scraping.
  *
  * Events dispatched on document:
- *   __wwai_listing     — first job-listing request; carries { token, url, method }
- *                        Full-Cycle uses POST listing; Direct uses GET listing.
+ *   __wwai_listing     — first job-listing GET; carries { token, url }
  *   __wwai_detail_post — any job-detail POST (may fire multiple times); carries { token, url, idParam }
  */
 (function () {
@@ -20,9 +19,8 @@
         // Both worlds share the same DOM, so dataset writes in MAIN are visible in isolated.
         const root = document.documentElement;
         if (type === 'listing') {
-            root.dataset.wwaiListingToken  = detail.token;
-            root.dataset.wwaiListingUrl    = detail.url;
-            root.dataset.wwaiListingMethod = detail.method || 'GET';
+            root.dataset.wwaiListingToken = detail.token;
+            root.dataset.wwaiListingUrl   = detail.url;
         } else if (type === 'detail_post') {
             const prev   = root.dataset.wwaiDetailTokens ? root.dataset.wwaiDetailTokens.split('\n') : [];
             const merged = [...new Set([...prev, detail.token])];
@@ -64,7 +62,7 @@
             if (token) {
                 if (method === 'GET') {
                     console.log('[WWAI intercept XHR GET]', url.slice(0, 120));
-                    _dispatch('listing', { token, url, method: 'GET' });
+                    _dispatch('listing', { token, url });
                 } else if (method === 'POST') {
                     console.log('[WWAI intercept XHR POST]', url, '| body:', bodyStr.slice(0, 200));
                     const idParam = bodyStr.includes('postingId=') ? 'postingId'
@@ -90,7 +88,7 @@
             if (token) {
                 if (method === 'GET') {
                     console.log('[WWAI intercept fetch GET]', url.slice(0, 120));
-                    _dispatch('listing', { token, url, method: 'GET' });
+                    _dispatch('listing', { token, url });
                 } else if (method === 'POST') {
                     console.log('[WWAI intercept fetch POST]', url, '| body:', bodyStr.slice(0, 200));
                     const idParam = bodyStr.includes('postingId=') ? 'postingId'
