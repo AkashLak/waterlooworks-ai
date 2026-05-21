@@ -25,6 +25,7 @@
             const prev = root.dataset.wwaiListingCandidates ? root.dataset.wwaiListingCandidates.split('\n') : [];
             if (!prev.includes(detail.token) && prev.length < 10) {
                 root.dataset.wwaiListingCandidates = [...prev, detail.token].join('\n');
+                console.log('[WWAI dispatch] listing_candidate written to dataset — count now:', prev.length + 1);
             }
             if (!root.dataset.wwaiListingCandidateUrl) root.dataset.wwaiListingCandidateUrl = detail.url;
         } else if (type === 'detail_post') {
