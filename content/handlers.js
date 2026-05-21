@@ -637,11 +637,18 @@ async function _handleBatch() {
 const _SCRAPE_CONCURRENCY = 5; // max simultaneous detail fetches
 
 async function _directFetch(url, options, retries = 2) {
+    // Always include credentials so WW's session cookies are sent with every request.
+    // Content-script fetches originate from the extension origin, not the page origin,
+    // so cookies are not sent by default without this flag.
+    const opts = { credentials: 'include', ...options };
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-            const res = await fetch(url, options);
+            const res = await fetch(url, opts);
             if (res.ok) return res;
-        } catch (_) {}
+            console.warn('[WWAI fetch]', res.status, url);
+        } catch (e) {
+            console.warn('[WWAI fetch] error:', e?.message, url);
+        }
         if (attempt < retries) await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
     }
     return null;
@@ -712,7 +719,11 @@ async function _runDirectScrapePhase1() {
 
 async function _runDirectScrapePhase2() {
     const rows = _directScrapeRows;
-    if (!rows?.length || !_directDetailTokens.length) return;
+    console.log('[WWAI P2] start — rows:', rows?.length, 'tokens:', _directDetailTokens.length, 'state:', _directScrapeState);
+    if (!rows?.length || !_directDetailTokens.length) {
+        console.log('[WWAI P2] early exit — rows or tokens missing');
+        return;
+    }
 
     // Ask the DB which jobs already have descriptions — skip those, only fetch new ones
     let describedIds = new Set();
@@ -750,7 +761,7 @@ async function _runDirectScrapePhase2() {
     // Cache token and resolved base URL — _onTableChange uses these for new rows later
     _directHtmlDetailToken = htmlToken;
     _directDetailBase = _directDetailUrl
-        ? new URL(_directDetailUrl, window.location.origin).href
+        ? new URL(_directDetailUrl, window.location.href).href
         : _directListingUrl
             ? `${new URL(_directListingUrl).origin}${new URL(_directListingUrl).pathname}`
             : `${window.location.origin}/myAccount/co-op/full/jobs.htm`;
@@ -777,7 +788,7 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
             rows.slice(i, i + _SCRAPE_CONCURRENCY).map(async (row) => {
                 if (!row.jobId) return;
                 try {
-                    const body = `action=${encodeURIComponent(_directHtmlDetailToken)}&postingId=${encodeURIComponent(row.jobId)}`;
+                    const body = `action=${encodeURIComponent(_directHtmlDetailToken)}&${_directDetailIdParam}=${encodeURIComponent(row.jobId)}`;
                     const res  = await _directFetch(_directDetailBase, {
                         method:  'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -830,22 +841,28 @@ async function _findHtmlDetailToken(sampleRow) {
     // One token returns HTML (job fields) — that's the HTML token.
     // Another returns JSON with geo data (city, country) — cache that too.
     const detailUrl = _directDetailUrl
-        ? new URL(_directDetailUrl, window.location.origin).href
+        ? new URL(_directDetailUrl, window.location.href).href
         : _directListingUrl
             ? `${new URL(_directListingUrl).origin}${new URL(_directListingUrl).pathname}`
             : `${window.location.origin}/myAccount/co-op/full/jobs.htm`;
 
+    console.log('[WWAI P2] _findHtmlDetailToken — detailUrl:', detailUrl, 'tokens:', _directDetailTokens.length, 'sample jobId:', sampleRow?.jobId);
+
     let htmlToken = null;
 
     for (const token of _directDetailTokens) {
-        const body = `action=${encodeURIComponent(token)}&postingId=${encodeURIComponent(sampleRow.jobId)}`;
+        const body = `action=${encodeURIComponent(token)}&${_directDetailIdParam}=${encodeURIComponent(sampleRow.jobId)}`;
         const res  = await _directFetch(detailUrl, {
             method:  'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body,
         });
-        if (!res) continue;
+        if (!res) {
+            console.log('[WWAI P2] token fetch failed (null) for token:', token.slice(0, 30));
+            continue;
+        }
         const text = await res.text();
+        console.log('[WWAI P2] token:', token.slice(0, 30), '— response length:', text.length, 'has tag__key-value-list:', text.includes('tag__key-value-list'));
         if (text.includes('tag__key-value-list')) {
             htmlToken = token;
         } else {
@@ -853,12 +870,13 @@ async function _findHtmlDetailToken(sampleRow) {
                 const geo = JSON.parse(text);
                 if (geo && (geo.city !== undefined || geo.country !== undefined || geo.data)) {
                     _directGeoToken = token;
+                    console.log('[WWAI P2] geo token identified');
                 }
             } catch (_) {}
-
         }
     }
 
+    console.log('[WWAI P2] htmlToken found:', !!htmlToken);
     return htmlToken;
 }
 
@@ -867,7 +885,7 @@ async function _findHtmlDetailToken(sampleRow) {
 async function _fetchGeoData(jobId) {
     if (!_directGeoToken || !_directDetailBase) return {};
     try {
-        const body = `action=${encodeURIComponent(_directGeoToken)}&postingId=${encodeURIComponent(jobId)}`;
+        const body = `action=${encodeURIComponent(_directGeoToken)}&${_directDetailIdParam}=${encodeURIComponent(jobId)}`;
         const res  = await _directFetch(_directDetailBase, {
             method:  'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

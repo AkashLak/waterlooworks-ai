@@ -23,6 +23,7 @@ let _directListingToken    = null; // action token from WaterlooWorks's own list
 let _directListingUrl      = null; // full captured URL — reused as pagination template
 let _directDetailTokens    = [];   // all captured POST action tokens (HTML token is typically last)
 let _directDetailUrl       = null; // URL used for job detail POSTs
+let _directDetailIdParam   = 'postingId'; // body parameter name WW uses for job ID (postingId or jobId)
 let _directScrapeRows      = null; // rows collected in Phase 1; grows as new rows appear
 let _directScrapeState     = 0;    // 0=idle 1=phase1 2=awaiting_detail_token 3=phase2 4=done
 let _directHtmlDetailToken = null; // the specific POST token that returns job HTML (cached after Phase 2 finds it)
@@ -341,12 +342,16 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         }
     }
 
-    function _onDetailToken(token, url) {
+    function _onDetailToken(token, url, idParam) {
+        console.log('[WWAI token] detail_post captured — token:', token.slice(0, 40), 'url:', url, 'idParam:', idParam, 'state:', _directScrapeState);
         if (!_directDetailTokens.includes(token)) _directDetailTokens.push(token);
         if (!_directDetailUrl && url) _directDetailUrl = url;
+        if (idParam && _directDetailIdParam === 'postingId') _directDetailIdParam = idParam;
         if (_directScrapeState === 2) {
             _directScrapeState = 3;
             _runDirectScrapePhase2();
+        } else {
+            console.log('[WWAI token] state is', _directScrapeState, '— Phase 2 will start when Phase 1 finishes (if not already)');
         }
     }
 
@@ -394,11 +399,12 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
 
     const _root = document.documentElement;
     if (_root.dataset.wwaiDetailTokens) {
+        const savedIdParam = _root.dataset.wwaiDetailIdParam || 'postingId';
         for (const t of _root.dataset.wwaiDetailTokens.split('\n').filter(Boolean)) {
-            _onDetailToken(t, _root.dataset.wwaiDetailUrl);
+            _onDetailToken(t, _root.dataset.wwaiDetailUrl, savedIdParam);
         }
     }
-    document.addEventListener('__wwai_detail_post', (e) => _onDetailToken(e.detail.token, e.detail.url));
+    document.addEventListener('__wwai_detail_post', (e) => _onDetailToken(e.detail.token, e.detail.url, e.detail.idParam));
 
     // Kick off initial status + table sync after DOM settles
     _refreshStatus();

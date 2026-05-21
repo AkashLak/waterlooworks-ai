@@ -26,6 +26,7 @@
             const merged = [...new Set([...prev, detail.token])];
             root.dataset.wwaiDetailTokens = merged.join('\n');
             root.dataset.wwaiDetailUrl    = detail.url;
+            if (detail.idParam) root.dataset.wwaiDetailIdParam = detail.idParam;
         }
         // Also fire an event for listeners that are already registered
         document.dispatchEvent(new CustomEvent('__wwai_' + type, {
@@ -61,8 +62,12 @@
             if (token) {
                 if (method === 'GET') {
                     _dispatch('listing', { token, url });
-                } else if (method === 'POST' && bodyStr.includes('postingId=')) {
-                    _dispatch('detail_post', { token, url });
+                } else if (method === 'POST') {
+                    console.log('[WWAI intercept XHR POST]', url, '| body:', bodyStr.slice(0, 120));
+                    const idParam = bodyStr.includes('postingId=') ? 'postingId'
+                                  : bodyStr.includes('jobId=')    ? 'jobId'
+                                  : null;
+                    if (idParam) _dispatch('detail_post', { token, url, idParam });
                 }
             }
         }
@@ -82,8 +87,12 @@
             if (token) {
                 if (method === 'GET') {
                     _dispatch('listing', { token, url });
-                } else if (method === 'POST' && bodyStr.includes('postingId=')) {
-                    _dispatch('detail_post', { token, url });
+                } else if (method === 'POST') {
+                    console.log('[WWAI intercept fetch POST]', url, '| body:', bodyStr.slice(0, 120));
+                    const idParam = bodyStr.includes('postingId=') ? 'postingId'
+                                  : bodyStr.includes('jobId=')    ? 'jobId'
+                                  : null;
+                    if (idParam) _dispatch('detail_post', { token, url, idParam });
                 }
             }
         }
