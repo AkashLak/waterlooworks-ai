@@ -655,6 +655,35 @@ async function _directFetch(url, options, retries = 2) {
 }
 
 async function _runDirectScrapePhase1() {
+    // If no GET listing token, try POST candidates (Full Cycle SPA navigation).
+    // WW loads the All Jobs listing via XHR POST when navigating client-side.
+    if (!_directListingToken && _directListingCandidates.length) {
+        const baseUrl = new URL(
+            document.documentElement.dataset.wwaiListingCandidateUrl || '/myAccount/co-op/full/jobs.htm',
+            window.location.href
+        ).href;
+
+        for (const candidate of _directListingCandidates) {
+            const testBody = `action=${encodeURIComponent(candidate)}&page=1&itemsPerPage=100`;
+            const testRes = await _directFetch(baseUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: testBody,
+            });
+            if (!testRes) continue;
+            let testJson;
+            try { testJson = await testRes.json(); } catch { continue; }
+            if (testJson.totalResults !== undefined && Array.isArray(testJson.data)) {
+                // This candidate is the listing endpoint
+                _directListingToken  = candidate;
+                _directListingUrl    = baseUrl;
+                _directListingMethod = 'POST';
+                console.log('[WWAI P1] POST listing token found:', candidate.slice(0, 30));
+                break;
+            }
+        }
+    }
+
     if (!_directListingToken || !_directListingUrl) {
         _directScrapeState = 0;
         return;
@@ -662,16 +691,28 @@ async function _runDirectScrapePhase1() {
 
     _updateStatusLine('Syncing all jobs…');
 
-    const template = new URL(_directListingUrl);
-    template.searchParams.set('itemsPerPage', '100');
+    // Helper: fetch one page of the listing (GET or POST depending on how listing was captured)
+    async function _fetchListingPage(pageNum) {
+        if (_directListingMethod === 'POST') {
+            const body = `action=${encodeURIComponent(_directListingToken)}&page=${pageNum}&itemsPerPage=100`;
+            return _directFetch(_directListingUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body,
+            });
+        }
+        const url = new URL(_directListingUrl);
+        url.searchParams.set('itemsPerPage', '100');
+        url.searchParams.set('page', String(pageNum));
+        return _directFetch(url.toString());
+    }
 
     const allRows = [];
     let page  = 1;
     let total = Infinity;
 
     while (allRows.length < total) {
-        template.searchParams.set('page', String(page));
-        const res = await _directFetch(template.toString());
+        const res = await _fetchListingPage(page);
         if (!res) break;
 
         let json;
@@ -915,12 +956,23 @@ async function _runPeriodicNewJobCheck() {
     if (!_directListingToken || !_directListingUrl) return;
     if (_directScrapeState < 4) return; // Phase 2 still running — skip this tick
 
-    try {
-        const template = new URL(_directListingUrl);
-        template.searchParams.set('itemsPerPage', '100');
-        template.searchParams.set('page', '1');
+    async function _fetchPeriodicPage(pageNum) {
+        if (_directListingMethod === 'POST') {
+            const body = `action=${encodeURIComponent(_directListingToken)}&page=${pageNum}&itemsPerPage=100`;
+            return _directFetch(_directListingUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body,
+            });
+        }
+        const url = new URL(_directListingUrl);
+        url.searchParams.set('itemsPerPage', '100');
+        url.searchParams.set('page', String(pageNum));
+        return _directFetch(url.toString());
+    }
 
-        const res = await _directFetch(template.toString());
+    try {
+        const res = await _fetchPeriodicPage(1);
         if (!res) return;
 
         let json;
@@ -940,8 +992,7 @@ async function _runPeriodicNewJobCheck() {
 
         while (newRows.length < newCount && page <= MAX_PAGES) {
             if (page > 1) {
-                template.searchParams.set('page', String(page));
-                const pageRes = await _directFetch(template.toString());
+                const pageRes = await _fetchPeriodicPage(page);
                 if (!pageRes) break;
                 try { pageJson = await pageRes.json(); } catch { break; }
             }

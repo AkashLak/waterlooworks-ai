@@ -19,8 +19,10 @@ let _lastRenderedData  = null; // last rendered result data — used by report f
 let _allJobsMap        = {};   // latest getAllJobs snapshot — fallback for qa_disguise in panel
 
 // ── Direct HTTP scrape state (populated by MAIN world interceptor) ─────────────
-let _directListingToken    = null; // action token from WaterlooWorks's own listing GET
-let _directListingUrl      = null; // full captured URL — reused as pagination template
+let _directListingToken      = null;  // action token for the listing endpoint (GET or POST)
+let _directListingUrl        = null;  // URL for listing requests
+let _directListingMethod     = 'GET'; // 'GET' (direct nav) or 'POST' (SPA nav from Full Cycle landing)
+let _directListingCandidates = [];    // POST action tokens captured before Phase 1 identifies the listing one
 let _directDetailTokens    = [];   // all captured POST action tokens (HTML token is typically last)
 let _directDetailUrl       = null; // URL used for job detail POSTs
 let _directDetailIdParam   = 'postingId'; // body parameter name WW uses for job ID (postingId or jobId)
@@ -392,8 +394,29 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         _listingObserver.observe({ entryTypes: ['resource'] });
     }
 
-    // ── Detail tokens: read from DOM dataset written by MAIN world interceptor ──
+    // ── Token bootstrap — read DOM dataset written by the MAIN world interceptor ─
     const _root = document.documentElement;
+
+    // POST listing candidates captured before document_idle
+    if (_root.dataset.wwaiListingCandidates) {
+        _directListingCandidates = _root.dataset.wwaiListingCandidates.split('\n').filter(Boolean);
+        if (_directScrapeState === 0 && !_directListingToken && _directListingCandidates.length) {
+            _directScrapeState = 1;
+            _runDirectScrapePhase1();
+        }
+    }
+    // Future candidates (arrive after document_idle)
+    document.addEventListener('__wwai_listing_candidate', (e) => {
+        if (!_directListingCandidates.includes(e.detail.token)) {
+            _directListingCandidates.push(e.detail.token);
+            if (_directScrapeState === 0 && !_directListingToken) {
+                _directScrapeState = 1;
+                _runDirectScrapePhase1();
+            }
+        }
+    });
+
+    // Detail tokens
     if (_root.dataset.wwaiDetailTokens) {
         const savedIdParam = _root.dataset.wwaiDetailIdParam || 'postingId';
         for (const t of _root.dataset.wwaiDetailTokens.split('\n').filter(Boolean)) {

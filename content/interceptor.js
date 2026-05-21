@@ -21,6 +21,12 @@
         if (type === 'listing') {
             root.dataset.wwaiListingToken = detail.token;
             root.dataset.wwaiListingUrl   = detail.url;
+        } else if (type === 'listing_candidate') {
+            const prev = root.dataset.wwaiListingCandidates ? root.dataset.wwaiListingCandidates.split('\n') : [];
+            if (!prev.includes(detail.token) && prev.length < 10) {
+                root.dataset.wwaiListingCandidates = [...prev, detail.token].join('\n');
+            }
+            if (!root.dataset.wwaiListingCandidateUrl) root.dataset.wwaiListingCandidateUrl = detail.url;
         } else if (type === 'detail_post') {
             const prev   = root.dataset.wwaiDetailTokens ? root.dataset.wwaiDetailTokens.split('\n') : [];
             const merged = [...new Set([...prev, detail.token])];
@@ -68,7 +74,11 @@
                     const idParam = bodyStr.includes('postingId=') ? 'postingId'
                                   : bodyStr.includes('jobId=')    ? 'jobId'
                                   : null;
-                    if (idParam) _dispatch('detail_post', { token, url, idParam });
+                    if (idParam) {
+                        _dispatch('detail_post', { token, url, idParam });
+                    } else {
+                        _dispatch('listing_candidate', { token, url });
+                    }
                 }
             }
         }
@@ -94,7 +104,11 @@
                     const idParam = bodyStr.includes('postingId=') ? 'postingId'
                                   : bodyStr.includes('jobId=')    ? 'jobId'
                                   : null;
-                    if (idParam) _dispatch('detail_post', { token, url, idParam });
+                    if (idParam) {
+                        _dispatch('detail_post', { token, url, idParam });
+                    } else {
+                        _dispatch('listing_candidate', { token, url });
+                    }
                 }
             }
         }
