@@ -670,11 +670,18 @@ async function _runDirectScrapePhase1() {
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: testBody,
             });
-            if (!testRes) continue;
+            if (!testRes) {
+                console.log('[WWAI P1] candidate fetch returned null:', candidate.slice(0, 20));
+                continue;
+            }
+            const rawText = await testRes.text();
             let testJson;
-            try { testJson = await testRes.json(); } catch { continue; }
+            try { testJson = JSON.parse(rawText); } catch {
+                console.log('[WWAI P1] candidate not JSON — length:', rawText.length, 'start:', rawText.slice(0, 80));
+                continue;
+            }
+            console.log('[WWAI P1] candidate JSON keys:', Object.keys(testJson).slice(0, 6), 'totalResults:', testJson.totalResults, 'data?', Array.isArray(testJson.data));
             if (testJson.totalResults !== undefined && Array.isArray(testJson.data)) {
-                // This candidate is the listing endpoint
                 _directListingToken  = candidate;
                 _directListingUrl    = baseUrl;
                 _directListingMethod = 'POST';
@@ -684,8 +691,22 @@ async function _runDirectScrapePhase1() {
         }
     }
 
-    if (!_directListingToken || !_directListingUrl) {
+    // DOM fallback — WW SPA navigation pre-renders the table; no listing GET/POST needed.
+    // Scrape visible rows directly if HTTP listing is unavailable.
+    const domFallbackRows = [];
+    if (!_directListingToken) {
+        await new Promise(r => setTimeout(r, 300)); // let Vue finish rendering
+        const colMap = WWScaper.scrapeColumnHeaders();
+        for (const tr of document.querySelectorAll('tr.table__row--body')) {
+            const row = WWScaper.scrapeListingRow(tr, colMap);
+            if (row.jobId) domFallbackRows.push(row);
+        }
+        console.log('[WWAI P1] DOM fallback — scraped', domFallbackRows.length, 'visible rows');
+    }
+
+    if (!_directListingToken && !domFallbackRows.length) {
         _directScrapeState = 0;
+        await _refreshStatus();
         return;
     }
 
@@ -707,27 +728,31 @@ async function _runDirectScrapePhase1() {
         return _directFetch(url.toString());
     }
 
-    const allRows = [];
-    let page  = 1;
-    let total = Infinity;
+    // Use DOM rows if we fell back to scraping; otherwise fetch via HTTP
+    const allRows = domFallbackRows.length ? domFallbackRows : [];
 
-    while (allRows.length < total) {
-        const res = await _fetchListingPage(page);
-        if (!res) break;
+    if (!domFallbackRows.length) {
+        let page  = 1;
+        let total = Infinity;
 
-        let json;
-        try { json = await res.json(); } catch { break; }
+        while (allRows.length < total) {
+            const res = await _fetchListingPage(page);
+            if (!res) break;
 
-        if (total === Infinity) total = json.totalResults ?? 0;
-        if (!json.data?.length) break;
+            let json;
+            try { json = await res.json(); } catch { break; }
 
-        for (const apiRow of json.data) {
-            const row = WWScaper.parseListingRow(apiRow);
-            if (row.jobId) allRows.push(row);
+            if (total === Infinity) total = json.totalResults ?? 0;
+            if (!json.data?.length) break;
+
+            for (const apiRow of json.data) {
+                const row = WWScaper.parseListingRow(apiRow);
+                if (row.jobId) allRows.push(row);
+            }
+
+            if (allRows.length >= total) break;
+            page++;
         }
-
-        if (allRows.length >= total) break;
-        page++;
     }
 
     if (!allRows.length) {
