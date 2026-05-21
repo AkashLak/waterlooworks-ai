@@ -379,8 +379,13 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         return false;
     }
 
-    // Also read from DOM dataset — the interceptor writes there for GETs captured
-    // before document_idle (which is before the Performance API scan runs).
+    // ── Token bootstrap — read from DOM dataset written by MAIN world interceptor ─
+    // The interceptor writes listing + detail tokens to dataset at document_start,
+    // so they're available even if events fired before document_idle.
+
+    const _root = document.documentElement;
+
+    // Listing token from dataset (GET captured before document_idle)
     if (_root.dataset.wwaiListingToken && !_directListingToken) {
         _onListingToken(_root.dataset.wwaiListingToken, _root.dataset.wwaiListingUrl || window.location.href);
     }
@@ -412,11 +417,7 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         _onListingToken(e.detail.token, e.detail.url);
     });
 
-    // ── Detail tokens: read from DOM dataset written by MAIN world interceptor ──
-    // The interceptor writes detail POST tokens (which contain postingId in the body)
-    // to dataset so they survive the document_start → document_idle gap.
-
-    const _root = document.documentElement;
+    // ── Detail tokens ──────────────────────────────────────────────────────────
     if (_root.dataset.wwaiDetailTokens) {
         const savedIdParam = _root.dataset.wwaiDetailIdParam || 'postingId';
         for (const t of _root.dataset.wwaiDetailTokens.split('\n').filter(Boolean)) {
