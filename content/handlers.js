@@ -900,6 +900,9 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                     );
                     if (!detail) { console.log('[P2 fetch] scrape null for', row.jobId); return; }
 
+                    const desc = WWScaper.extractJobDescription(detail);
+                    console.log('[P2 fetch] job', row.jobId, 'desc len:', desc?.length ?? 0, 'summary?', !!detail.jobSummary, 'resp?', !!detail.jobResponsibilities);
+
                     const geo = await _fetchGeoData(row.jobId);
 
                     const jobData = {
@@ -913,7 +916,7 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                         term:                  row.term        || detail.workTerm || detail.term || '',
                         deadline:              row.appDeadline || detail.applicationDeadline || detail.appDeadline || null,
                         organization:          row.employer    || detail.employer    || '',
-                        description:           WWScaper.extractJobDescription(detail) || null,
+                        description:           desc || null,
                         employmentArrangement: detail.employmentLocationArrangement  || '',
                         externalUrl:           _decodeHtml(detail.ifByWebsiteGoTo || detail.ifByEmailSendTo || ''),
                     };
@@ -921,7 +924,7 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                     await WWAnalyzer.submitJob(jobData);
                     completed++;
                     console.log('[P2 fetch] submitted', row.jobId, 'total:', completed);
-                } catch (e) { console.log('[P2 fetch] error for', row.jobId, e?.message); }
+                } catch (e) { console.log('[P2 fetch] error for', row.jobId, e?.message, JSON.stringify(e)); }
             })
         );
         if (i + _SCRAPE_CONCURRENCY < total) {
