@@ -10,11 +10,25 @@ let _overlayEl  = null; // injected overlay for cross-page search results
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
-// Extracts the first HTTP URL found in a plain-text string.
-// Used to pull external application links out of "Additional Application Information" blocks.
-function _extractUrl(text) {
-    const m = text.match(/https?:\/\/[^\s,)]+/);
-    return m ? m[0] : '';
+// Extracts an external application URL from an "Additional Application Information" block.
+// Only returns a URL when "apply" appears in the text leading up to it — avoids picking up
+// informational links like "visit our website at https://..." that aren't application links.
+function _extractExternalAppUrl(text) {
+    for (const match of text.matchAll(/https?:\/\/[^\s,)]+/g)) {
+        const before = text.slice(Math.max(0, match.index - 200), match.index).toLowerCase();
+        if (/\bappl[yi]/.test(before)) return match[0];
+    }
+    return '';
+}
+
+// Decodes a fetched HTML response with charset detection.
+// response.text() defaults to UTF-8; WW job detail endpoints may use ISO-8859-1/windows-1252,
+// which causes é→U+FFFD corruption. Falls back to windows-1252 if replacement chars appear.
+async function _fetchHtmlText(res) {
+    const bytes = await res.arrayBuffer();
+    const utf8  = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+    if (!utf8.includes('�')) return utf8;
+    return new TextDecoder('windows-1252').decode(bytes);
 }
 
 // ── Job submission and analysis polling ────────────────────────────────────────
@@ -100,7 +114,7 @@ async function _submitAndPoll(detail) {
         organization:          row.organization || fresh.employer    || '',
         description:           WWScaper.extractJobDescription(fresh) || null,
         employmentArrangement: fresh.employmentLocationArrangement   || '',
-        externalUrl:           _decodeHtml(fresh.ifByWebsiteGoTo || fresh.ifByEmailSendTo || _extractUrl(fresh.additionalApplicationInformation || '') || ''),
+        externalUrl:           _decodeHtml(fresh.ifByWebsiteGoTo || fresh.ifByEmailSendTo || _extractExternalAppUrl(fresh.additionalApplicationInformation || '') || ''),
     };
 
     let submitResult;
@@ -882,7 +896,7 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                     });
                     if (!res) return;
 
-                    const html = await res.text();
+                    const html = await _fetchHtmlText(res);
                     if (!html.includes('tag__key-value-list')) return;
 
                     const detail = WWScaper.scrapeJobDetailFromHtml(
@@ -915,7 +929,7 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                         applicationDocumentsRequired: detail.applicationDocumentsRequired || '',
                         workTermDuration:            detail.workTermDuration || '',
                         employmentArrangement:       detail.employmentLocationArrangement || '',
-                        externalUrl:                 _decodeHtml(detail.ifByWebsiteGoTo || detail.ifByEmailSendTo || _extractUrl(detail.additionalApplicationInformation || '') || ''),
+                        externalUrl:                 _decodeHtml(detail.ifByWebsiteGoTo || detail.ifByEmailSendTo || _extractExternalAppUrl(detail.additionalApplicationInformation || '') || ''),
                     });
                     fetched++;
                 } catch (_) {}
