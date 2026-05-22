@@ -346,7 +346,6 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         if (_directListingToken) return; // only use the first capture
         _directListingToken = token;
         _directListingUrl   = url;
-        console.log('[WWAI listing] token captured — url:', url, 'state:', _directScrapeState);
         if (_directScrapeState === 0) {
             _directScrapeState = 1;
             _runDirectScrapePhase1();

@@ -8,6 +8,15 @@ let _pollTimer  = null;
 let _pollCount  = 0;
 let _overlayEl  = null; // injected overlay for cross-page search results
 
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+// Extracts the first HTTP URL found in a plain-text string.
+// Used to pull external application links out of "Additional Application Information" blocks.
+function _extractUrl(text) {
+    const m = text.match(/https?:\/\/[^\s,)]+/);
+    return m ? m[0] : '';
+}
+
 // ── Job submission and analysis polling ────────────────────────────────────────
 
 /**
@@ -91,7 +100,7 @@ async function _submitAndPoll(detail) {
         organization:          row.organization || fresh.employer    || '',
         description:           WWScaper.extractJobDescription(fresh) || null,
         employmentArrangement: fresh.employmentLocationArrangement   || '',
-        externalUrl:           _decodeHtml(fresh.ifByWebsiteGoTo || fresh.ifByEmailSendTo || ''),
+        externalUrl:           _decodeHtml(fresh.ifByWebsiteGoTo || fresh.ifByEmailSendTo || _extractUrl(fresh.additionalApplicationInformation || '') || ''),
     };
 
     let submitResult;
@@ -675,7 +684,6 @@ async function _runDirectScrapePhase1() {
                 _directListingToken  = candidate;
                 _directListingUrl    = baseUrl;
                 _directListingMethod = 'POST';
-                console.log('[WWAI P1] POST listing token found:', candidate.slice(0, 30));
                 break;
             }
         }
@@ -689,7 +697,6 @@ async function _runDirectScrapePhase1() {
         for (const row of WWScaper.scrapeAllListingRows()) {
             if (row.jobId) domFallbackRows.push(row);
         }
-        console.log('[WWAI P1] DOM fallback — scraped', domFallbackRows.length, 'visible rows');
     }
 
     if (!_directListingToken && !domFallbackRows.length) {
@@ -775,7 +782,6 @@ async function _runDirectScrapePhase1() {
 // Skips HTTP candidate trials; scrapes visible rows immediately, then transitions to Phase 2.
 async function _runDomPhase1() {
     const rows = WWScaper.scrapeAllListingRows().filter(r => r.jobId);
-    console.log('[WWAI P1 DOM] scraped', rows.length, 'rows from rendered table');
     if (!rows.length) {
         _directScrapeState = 0;
         return;
@@ -800,11 +806,7 @@ async function _runDomPhase1() {
 
 async function _runDirectScrapePhase2() {
     const rows = _directScrapeRows;
-    console.log('[WWAI P2] start — rows:', rows?.length, 'tokens:', _directDetailTokens.length, 'state:', _directScrapeState);
-    if (!rows?.length || !_directDetailTokens.length) {
-        console.log('[WWAI P2] early exit — rows or tokens missing');
-        return;
-    }
+    if (!rows?.length || !_directDetailTokens.length) return;
 
     // Ask the DB which jobs already have descriptions — skip those, only fetch new ones
     let describedIds = new Set();
@@ -906,14 +908,14 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                         deadline:            row.appDeadline || detail.applicationDeadline || detail.appDeadline || null,
                         organization:        row.organization || row.employer || detail.employer || '',
                         description:         desc || null,
-                        jobSummary:          detail.jobSummary || '',
-                        jobResponsibilities: detail.jobResponsibilities || '',
-                        requiredSkills:      detail.requiredSkills || '',
-                        requiredEducation:   detail.requiredEducation || '',
-                        preferredEducation:  detail.preferredEducation || '',
-                        workTermDuration:    detail.workTermDuration || '',
-                        employmentArrangement: detail.employmentLocationArrangement || '',
-                        externalUrl:         _decodeHtml(detail.ifByWebsiteGoTo || detail.ifByEmailSendTo || ''),
+                        jobSummary:                  detail.jobSummary || '',
+                        jobResponsibilities:         detail.jobResponsibilities || '',
+                        requiredSkills:              detail.requiredSkills || '',
+                        compensationAndBenefits:     detail.compensationAndBenefits || '',
+                        applicationDocumentsRequired: detail.applicationDocumentsRequired || '',
+                        workTermDuration:            detail.workTermDuration || '',
+                        employmentArrangement:       detail.employmentLocationArrangement || '',
+                        externalUrl:                 _decodeHtml(detail.ifByWebsiteGoTo || detail.ifByEmailSendTo || _extractUrl(detail.additionalApplicationInformation || '') || ''),
                     });
                     fetched++;
                 } catch (_) {}
