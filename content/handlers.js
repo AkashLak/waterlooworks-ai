@@ -634,7 +634,7 @@ async function _handleBatch() {
 //
 // Both phases use WaterlooWorks's own authenticated session — no extra login needed.
 
-const _SCRAPE_CONCURRENCY = 1; // sequential — avoids overwhelming the backend/OpenAI
+const _SCRAPE_CONCURRENCY = 5; // parallel HTML fetches from WaterlooWorks
 
 async function _directFetch(url, options, retries = 2) {
     // Always include credentials so WW's session cookies are sent with every request.
@@ -645,10 +645,7 @@ async function _directFetch(url, options, retries = 2) {
         try {
             const res = await fetch(url, opts);
             if (res.ok) return res;
-            console.warn('[WWAI fetch]', res.status, url);
-        } catch (e) {
-            console.warn('[WWAI fetch] error:', e?.message, url);
-        }
+        } catch (_) {}
         if (attempt < retries) await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
     }
     return null;
@@ -670,19 +667,10 @@ async function _runDirectScrapePhase1() {
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: testBody,
             });
-            if (!testRes) {
-                console.log('[WWAI P1] candidate fetch returned null:', candidate.slice(0, 20));
-                continue;
-            }
+            if (!testRes) continue;
             const rawText = await testRes.text();
             let testJson;
-            try { testJson = JSON.parse(rawText); } catch {
-                console.log('[WWAI P1] candidate not JSON — length:', rawText.length, 'start:', rawText.slice(0, 80));
-                continue;
-            }
-            const keys = Object.keys(testJson);
-            const firstVal = keys.length ? testJson[keys[0]] : undefined;
-            console.log('[WWAI P1] candidate JSON keys:', keys.slice(0, 6), 'firstVal:', JSON.stringify(firstVal)?.slice(0, 80), 'totalResults:', testJson.totalResults, 'data?', Array.isArray(testJson.data));
+            try { testJson = JSON.parse(rawText); } catch { continue; }
             if (testJson.totalResults !== undefined && Array.isArray(testJson.data)) {
                 _directListingToken  = candidate;
                 _directListingUrl    = baseUrl;
@@ -869,12 +857,15 @@ async function _runDirectScrapePhase2() {
     _scheduleTableSync();
 }
 
-// Fetches and submits descriptions for a given set of rows using the cached HTML token.
-// Called by Phase 2 on initial load and by _onTableChange for any new rows that appear later.
+// Fetches HTML descriptions for all rows from WaterlooWorks (concurrent),
+// then sends ONE bulk request to the backend per call — no per-job rate limit exposure.
 async function _fetchAndSubmitDescriptions(rows, statusLabel) {
-    let completed = 0;
     const total = rows.length;
     _updateStatusLine(`${statusLabel}…`);
+
+    // Step 1: fetch HTML for all jobs concurrently (5 at a time from WW)
+    const jobDatas = [];
+    let fetched = 0;
 
     for (let i = 0; i < total; i += _SCRAPE_CONCURRENCY) {
         await Promise.all(
@@ -887,28 +878,20 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body,
                     });
-                    if (!res) { console.log('[P2 fetch] null res for', row.jobId); return; }
+                    if (!res) return;
 
                     const html = await res.text();
-                    if (!html.includes('tag__key-value-list')) {
-                        console.log('[P2 fetch] no kv-list for', row.jobId, 'len:', html.length, 'start:', html.slice(0, 60));
-                        return;
-                    }
+                    if (!html.includes('tag__key-value-list')) return;
 
                     const detail = WWScaper.scrapeJobDetailFromHtml(
-                        html, row.jobId, row.title, row.employer, row.division
+                        html, row.jobId, row.title, row.organization || row.employer || '', row.division
                     );
-                    if (!detail) { console.log('[P2 fetch] scrape null for', row.jobId); return; }
+                    if (!detail) return;
 
                     const desc = WWScaper.extractJobDescription(detail);
-                    console.log('[P2 fetch] job', row.jobId, 'desc len:', desc?.length ?? 0, 'summary?', !!detail.jobSummary, 'resp?', !!detail.jobResponsibilities);
+                    const geo  = await _fetchGeoData(row.jobId);
 
-                    const geo = await _fetchGeoData(row.jobId);
-
-                    // Build jobData explicitly — do NOT spread ...detail.
-                    // scrapeJobDetailFromHtml parses the full page HTML and produces many
-                    // extra fields the backend's SUBMIT_SCHEMA doesn't accept, causing 400s.
-                    const jobData = {
+                    jobDatas.push({
                         jobId:               row.jobId,
                         title:               row.title || '',
                         employer:            row.organization || row.employer || detail.employer || '',
@@ -931,20 +914,27 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                         workTermDuration:    detail.workTermDuration || '',
                         employmentArrangement: detail.employmentLocationArrangement || '',
                         externalUrl:         _decodeHtml(detail.ifByWebsiteGoTo || detail.ifByEmailSendTo || ''),
-                    };
-
-                    await WWAnalyzer.submitJob(jobData);
-                    completed++;
-                    console.log('[P2 fetch] submitted', row.jobId, 'total:', completed);
-                } catch (e) { console.log('[P2 fetch] error for', row.jobId, e?.message, JSON.stringify(e)); }
+                    });
+                    fetched++;
+                } catch (_) {}
             })
         );
-        if (i + _SCRAPE_CONCURRENCY < total) {
-            _updateStatusLine(`${statusLabel}… ${completed}/${total}`);
-        }
+        _updateStatusLine(`${statusLabel}… ${fetched}/${total} fetched`);
     }
 
-    _updateStatusLine(`${completed} jobs ready`);
+    if (!jobDatas.length) {
+        _updateStatusLine('No descriptions fetched');
+        return;
+    }
+
+    // Step 2: single bulk request — backend queues AI analysis at a controlled rate internally
+    _updateStatusLine(`Submitting ${jobDatas.length} descriptions…`);
+    try {
+        const result = await WWAnalyzer.bulkDescriptions(jobDatas);
+        _updateStatusLine(`${result?.stored ?? jobDatas.length} jobs ready`);
+    } catch (e) {
+        _updateStatusLine(`Bulk submit failed — ${e?.message}`);
+    }
 }
 
 async function _findHtmlDetailToken(sampleRow) {
@@ -957,8 +947,6 @@ async function _findHtmlDetailToken(sampleRow) {
             ? `${new URL(_directListingUrl).origin}${new URL(_directListingUrl).pathname}`
             : `${window.location.origin}/myAccount/co-op/full/jobs.htm`;
 
-    console.log('[WWAI P2] _findHtmlDetailToken — detailUrl:', detailUrl, 'tokens:', _directDetailTokens.length, 'sample jobId:', sampleRow?.jobId);
-
     let htmlToken = null;
 
     for (const token of _directDetailTokens) {
@@ -968,12 +956,8 @@ async function _findHtmlDetailToken(sampleRow) {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body,
         });
-        if (!res) {
-            console.log('[WWAI P2] token fetch failed (null) for token:', token.slice(0, 30));
-            continue;
-        }
+        if (!res) continue;
         const text = await res.text();
-        console.log('[WWAI P2] token:', token.slice(0, 30), '— response length:', text.length, 'has tag__key-value-list:', text.includes('tag__key-value-list'));
         if (text.includes('tag__key-value-list')) {
             htmlToken = token;
         } else {
@@ -981,13 +965,11 @@ async function _findHtmlDetailToken(sampleRow) {
                 const geo = JSON.parse(text);
                 if (geo && (geo.city !== undefined || geo.country !== undefined || geo.data)) {
                     _directGeoToken = token;
-                    console.log('[WWAI P2] geo token identified');
                 }
             } catch (_) {}
         }
     }
 
-    console.log('[WWAI P2] htmlToken found:', !!htmlToken);
     return htmlToken;
 }
 

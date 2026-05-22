@@ -56,6 +56,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'submitJob':
             return respond(_handleSubmitJob(message.jobData));
 
+        case 'bulkDescriptions':
+            return respond(WWApi.bulkDescriptions(message.jobs));
+
         case 'getJobAnalyses':
             return respond(WWApi.getJobAnalyses(message.jobId));
 

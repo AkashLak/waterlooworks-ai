@@ -354,15 +354,12 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
     }
 
     function _onDetailToken(token, url, idParam) {
-        console.log('[WWAI token] detail_post captured — token:', token.slice(0, 40), 'url:', url, 'idParam:', idParam, 'state:', _directScrapeState);
         if (!_directDetailTokens.includes(token)) _directDetailTokens.push(token);
         if (!_directDetailUrl && url) _directDetailUrl = url;
         if (idParam && _directDetailIdParam === 'postingId') _directDetailIdParam = idParam;
         if (_directScrapeState === 2) {
             _directScrapeState = 3;
             _runDirectScrapePhase2();
-        } else {
-            console.log('[WWAI token] state is', _directScrapeState, '— Phase 2 will start when Phase 1 finishes (if not already)');
         }
     }
 
@@ -405,17 +402,9 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
     // ── Token bootstrap — read DOM dataset written by the MAIN world interceptor ─
     const _root = document.documentElement;
 
-    console.log('[WWAI init] dataset —',
-        'listingToken:', !!_root.dataset.wwaiListingToken,
-        'listingCandidates:', _root.dataset.wwaiListingCandidates?.split('\n').filter(Boolean).length ?? 0,
-        'detailTokens:', _root.dataset.wwaiDetailTokens?.split('\n').filter(Boolean).length ?? 0,
-        'state:', _directScrapeState
-    );
-
     // POST listing candidates captured before document_idle
     if (_root.dataset.wwaiListingCandidates) {
         _directListingCandidates = _root.dataset.wwaiListingCandidates.split('\n').filter(Boolean);
-        console.log('[WWAI init] candidates from dataset:', _directListingCandidates.length);
         if (_directScrapeState === 0 && !_directListingToken && _directListingCandidates.length) {
             _directScrapeState = 1;
             _runDirectScrapePhase1();

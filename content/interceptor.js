@@ -25,7 +25,6 @@
             const prev = root.dataset.wwaiListingCandidates ? root.dataset.wwaiListingCandidates.split('\n') : [];
             if (!prev.includes(detail.token) && prev.length < 10) {
                 root.dataset.wwaiListingCandidates = [...prev, detail.token].join('\n');
-                console.log('[WWAI dispatch] listing_candidate written to dataset — count now:', prev.length + 1);
             }
             if (!root.dataset.wwaiListingCandidateUrl) root.dataset.wwaiListingCandidateUrl = detail.url;
         } else if (type === 'detail_post') {
@@ -68,10 +67,8 @@
 
             if (token) {
                 if (method === 'GET') {
-                    console.log('[WWAI intercept XHR GET]', url.slice(0, 120));
                     _dispatch('listing', { token, url });
                 } else if (method === 'POST') {
-                    console.log('[WWAI intercept XHR POST]', url, '| body:', bodyStr.slice(0, 200));
                     const idParam = bodyStr.includes('postingId=') ? 'postingId'
                                   : bodyStr.includes('jobId=')    ? 'jobId'
                                   : null;
@@ -98,10 +95,8 @@
             const token   = _extractToken(srcStr);
             if (token) {
                 if (method === 'GET') {
-                    console.log('[WWAI intercept fetch GET]', url.slice(0, 120));
                     _dispatch('listing', { token, url });
                 } else if (method === 'POST') {
-                    console.log('[WWAI intercept fetch POST]', url, '| body:', bodyStr.slice(0, 200));
                     const idParam = bodyStr.includes('postingId=') ? 'postingId'
                                   : bodyStr.includes('jobId=')    ? 'jobId'
                                   : null;
