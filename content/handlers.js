@@ -905,20 +905,32 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
 
                     const geo = await _fetchGeoData(row.jobId);
 
+                    // Build jobData explicitly — do NOT spread ...detail.
+                    // scrapeJobDetailFromHtml parses the full page HTML and produces many
+                    // extra fields the backend's SUBMIT_SCHEMA doesn't accept, causing 400s.
                     const jobData = {
-                        ...detail,
-                        city:                  row.city        || geo.city           || detail.city    || '',
-                        province:              detail.province || '',
-                        country:               geo.country     || detail.country     || '',
-                        openings:              (row.openings ?? parseInt(detail.numberOfJobOpenings ?? detail.openings, 10)) || null,
-                        level:                 row.level       || detail.level || '',
-                        apps:                  row.apps        || null,
-                        term:                  row.term        || detail.workTerm || detail.term || '',
-                        deadline:              row.appDeadline || detail.applicationDeadline || detail.appDeadline || null,
-                        organization:          row.employer    || detail.employer    || '',
-                        description:           desc || null,
-                        employmentArrangement: detail.employmentLocationArrangement  || '',
-                        externalUrl:           _decodeHtml(detail.ifByWebsiteGoTo || detail.ifByEmailSendTo || ''),
+                        jobId:               row.jobId,
+                        title:               row.title || '',
+                        employer:            row.organization || row.employer || detail.employer || '',
+                        division:            row.division || detail.division || '',
+                        city:                row.city || geo.city || detail.city || '',
+                        province:            detail.province || '',
+                        country:             geo.country || detail.country || '',
+                        openings:            (row.openings ?? parseInt(detail.numberOfJobOpenings ?? detail.openings, 10)) || null,
+                        level:               row.level || detail.level || '',
+                        apps:                row.apps || null,
+                        term:                row.term || detail.workTerm || detail.term || '',
+                        deadline:            row.appDeadline || detail.applicationDeadline || detail.appDeadline || null,
+                        organization:        row.organization || row.employer || detail.employer || '',
+                        description:         desc || null,
+                        jobSummary:          detail.jobSummary || '',
+                        jobResponsibilities: detail.jobResponsibilities || '',
+                        requiredSkills:      detail.requiredSkills || '',
+                        requiredEducation:   detail.requiredEducation || '',
+                        preferredEducation:  detail.preferredEducation || '',
+                        workTermDuration:    detail.workTermDuration || '',
+                        employmentArrangement: detail.employmentLocationArrangement || '',
+                        externalUrl:         _decodeHtml(detail.ifByWebsiteGoTo || detail.ifByEmailSendTo || ''),
                     };
 
                     await WWAnalyzer.submitJob(jobData);
