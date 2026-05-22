@@ -634,7 +634,7 @@ async function _handleBatch() {
 //
 // Both phases use WaterlooWorks's own authenticated session — no extra login needed.
 
-const _SCRAPE_CONCURRENCY = 5; // max simultaneous detail fetches
+const _SCRAPE_CONCURRENCY = 1; // sequential — avoids overwhelming the backend/OpenAI
 
 async function _directFetch(url, options, retries = 2) {
     // Always include credentials so WW's session cookies are sent with every request.
