@@ -798,7 +798,7 @@ async function _runDomPhase1() {
 
     _directScrapeRows = rows;
     _lastKnownTotal   = rows.length;
-    _updateStatusLine(`${rows.length} jobs synced — loading descriptions…`);
+    _updateStatusLine(`${rows.length} jobs synced — click any job once to load descriptions`);
 
     const syncPayload = rows.map(({ boardUrl, ...r }) => r);
     try { await WWAnalyzer.syncActiveJobs(syncPayload); } catch (_) {}
@@ -812,6 +812,12 @@ async function _runDomPhase1() {
 async function _runDirectScrapePhase2() {
     const rows = _directScrapeRows;
     if (!rows?.length) return;
+
+    if (!_directDetailTokens.length) {
+        _directScrapeState = 2;
+        _updateStatusLine(`${rows.length} jobs synced — click any job once to load descriptions`);
+        return;
+    }
 
     // Ask the DB which jobs already have descriptions — skip those, only fetch new ones
     let describedIds = new Set();
@@ -838,13 +844,12 @@ async function _runDirectScrapePhase2() {
     }
 
     // Find which captured token returns job detail HTML (not the JSON geo-data token)
-    console.log('[wwai] Phase2 probing — detailTokens:', _directDetailTokens.length, 'candidates:', _directListingCandidates.length, 'sample job:', rowsToFetch[0]?.jobId);
     const htmlToken = await _findHtmlDetailToken(rowsToFetch[0]);
-    console.log('[wwai] Phase2 htmlToken found:', htmlToken);
     if (!htmlToken) {
-        _directScrapeState = 4;
-        _updateStatusLine(`${describedIds.size} jobs loaded`);
-        await _refreshStatus();
+        // No detail token available yet — fall back to waiting for the user to click any job.
+        // _onDetailToken will restart Phase 2 once a token is captured.
+        _directScrapeState = 2;
+        _updateStatusLine(`${rows.length} jobs synced — click any job once to load descriptions`);
         return;
     }
 
@@ -958,17 +963,8 @@ async function _findHtmlDetailToken(sampleRow) {
 
     let htmlToken = null;
 
-    // Try known detail tokens first, then fall back to listing candidates.
-    // Listing candidates are POST action tokens captured during page load that
-    // didn't include a postingId — one of them is typically the detail action.
-    const tokensToTry = [
-        ..._directDetailTokens,
-        ..._directListingCandidates.filter(t => !_directDetailTokens.includes(t)),
-    ];
-
-    for (const token of tokensToTry) {
-        const idParam = _directDetailTokens.includes(token) ? _directDetailIdParam : 'postingId';
-        const body = `action=${encodeURIComponent(token)}&${idParam}=${encodeURIComponent(sampleRow.jobId)}`;
+    for (const token of _directDetailTokens) {
+        const body = `action=${encodeURIComponent(token)}&${_directDetailIdParam}=${encodeURIComponent(sampleRow.jobId)}`;
         const res  = await _directFetch(detailUrl, {
             method:  'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -978,12 +974,6 @@ async function _findHtmlDetailToken(sampleRow) {
         const text = await res.text();
         if (text.includes('tag__key-value-list')) {
             htmlToken = token;
-            // Register as a proper detail token so future code paths use it.
-            if (!_directDetailTokens.includes(token)) {
-                _directDetailTokens.push(token);
-                _directDetailUrl  = _directDetailUrl || detailUrl;
-                _directDetailIdParam = idParam;
-            }
         } else {
             try {
                 const geo = JSON.parse(text);
