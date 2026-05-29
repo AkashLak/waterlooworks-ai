@@ -838,7 +838,9 @@ async function _runDirectScrapePhase2() {
     }
 
     // Find which captured token returns job detail HTML (not the JSON geo-data token)
+    console.log('[wwai] Phase2 probing — detailTokens:', _directDetailTokens.length, 'candidates:', _directListingCandidates.length, 'sample job:', rowsToFetch[0]?.jobId);
     const htmlToken = await _findHtmlDetailToken(rowsToFetch[0]);
+    console.log('[wwai] Phase2 htmlToken found:', htmlToken);
     if (!htmlToken) {
         _directScrapeState = 4;
         _updateStatusLine(`${describedIds.size} jobs loaded`);
