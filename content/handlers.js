@@ -13,19 +13,26 @@ let _overlayEl  = null; // injected overlay for cross-page search results
 // Extracts an external application URL from an "Additional Application Information" block.
 // Only returns a URL when "apply" appears in the text leading up to it — avoids picking up
 // informational links like "visit our website at https://..." that aren't application links.
-const SYNC_GATE_MS = 30 * 60 * 1000;
+// Returns true if WW's listing GET URL contains params beyond the standard pagination ones,
+// meaning the user has active filters that would produce a partial job list.
+// POST listings are always unfiltered — the extension reconstructs the body without filter params.
+function _isListingFiltered() {
+    if (_directListingMethod !== 'GET' || !_directListingUrl) return false;
+    try {
+        const url = new URL(_directListingUrl);
+        const STANDARD = new Set(['action', 'page', 'itemsPerPage']);
+        for (const key of url.searchParams.keys()) {
+            if (!STANDARD.has(key)) return true;
+        }
+    } catch (_) {}
+    return false;
+}
 
 function _getTermKey() {
     const d = new Date(), m = d.getMonth() + 1, day = d.getDate(), y = d.getFullYear();
     if ((m === 5 && day >= 11) || m === 6 || m === 7 || (m === 8 && day <= 21)) return `${y}_spring`;
     if ((m === 9 && day >= 8) || m === 10 || m === 11 || (m === 12 && day <= 23)) return `${y}_fall`;
     return `${y}_winter`;
-}
-
-function _showSkippedSyncStatus(minsAgo) {
-    const el = document.getElementById('wwai-status-line');
-    if (!el) return;
-    el.textContent = minsAgo === 0 ? 'Synced just now' : `Synced ${minsAgo} min ago`;
 }
 
 function _extractExternalAppUrl(text) {
@@ -531,15 +538,23 @@ async function _handleSearch(searchType) {
 
 // ── Status line ────────────────────────────────────────────────────────────────
 
-function _updateStatusLine(jobCount) {
+function _updateStatusLine(msg) {
     const el = document.getElementById('wwai-status-line');
-    if (el) el.textContent = `${jobCount ?? 0} jobs in database`;
+    if (!el) return;
+    el.textContent = typeof msg === 'number' ? `${msg} jobs in database` : (msg ?? '');
 }
 
 async function _refreshStatus() {
     try {
         const status = await WWAnalyzer.getStatus();
-        _updateStatusLine(status.totalJobs ?? status.jobCount ?? 0);
+        const count  = status.totalJobs ?? status.jobCount ?? 0;
+        if (_lastSyncedAt) {
+            const minsAgo   = Math.floor((Date.now() - _lastSyncedAt) / 60000);
+            const syncLabel = minsAgo === 0 ? 'just now' : `${minsAgo} min ago`;
+            _updateStatusLine(`${count} jobs · synced ${syncLabel}`);
+        } else {
+            _updateStatusLine(count);
+        }
     } catch (_) {}
 }
 
@@ -692,19 +707,6 @@ async function _directFetch(url, options, retries = 2) {
 async function _runDirectScrapePhase1() {
     // Gate: skip backend sync if a full sync ran within the last 30 minutes.
     // Still populate _directScrapeRows from the DOM so Phase 2 knows what jobs exist.
-    const termKey  = _getTermKey();
-    const lastSync = await WWStorage.getLastSyncTime(termKey);
-    if (lastSync && (Date.now() - lastSync) < SYNC_GATE_MS) {
-        const minsAgo = Math.floor((Date.now() - lastSync) / 60000);
-        const domRows = WWScaper.scrapeAllListingRows().filter(r => r.jobId);
-        if (domRows.length) { _directScrapeRows = domRows; _lastKnownTotal = domRows.length; }
-        _showSkippedSyncStatus(minsAgo);
-        _scheduleTableSync();
-        _directScrapeState = 3;
-        _runDirectScrapePhase2();
-        return;
-    }
-
     // If no GET listing token, try POST candidates (Full Cycle SPA navigation).
     // WW loads the All Jobs listing via XHR POST when navigating client-side.
     if (!_directListingToken && _directListingCandidates.length) {
@@ -806,8 +808,12 @@ async function _runDirectScrapePhase1() {
     // Sync row-level metadata to backend immediately (no descriptions yet)
     const syncPayload = allRows.map(({ boardUrl, ...r }) => r);
     try {
-        await WWAnalyzer.syncActiveJobs(syncPayload);
-        await WWStorage.setLastSyncTime(_getTermKey());
+        const syncResult = await WWAnalyzer.syncActiveJobs(syncPayload, _getTermKey(), _isListingFiltered());
+        if (syncResult?.skipped) {
+            _lastSyncedAt = new Date(syncResult.nextSyncAt).getTime() - 30 * 60 * 1000;
+        } else {
+            _lastSyncedAt = Date.now();
+        }
     } catch (_) {}
 
     _scheduleTableSync(); // refresh badge injection with newly synced rows
@@ -832,24 +838,16 @@ async function _runDomPhase1() {
     _directScrapeRows = rows;
     _lastKnownTotal   = rows.length;
 
-    // Gate: skip backend sync if a full sync ran within the last 30 minutes.
-    const termKey  = _getTermKey();
-    const lastSync = await WWStorage.getLastSyncTime(termKey);
-    if (lastSync && (Date.now() - lastSync) < SYNC_GATE_MS) {
-        const minsAgo = Math.floor((Date.now() - lastSync) / 60000);
-        _showSkippedSyncStatus(minsAgo);
-        _scheduleTableSync();
-        _directScrapeState = 3;
-        _runDirectScrapePhase2();
-        return;
-    }
-
     _updateStatusLine(`${rows.length} jobs synced — click any job once to load descriptions`);
 
     const syncPayload = rows.map(({ boardUrl, ...r }) => r);
     try {
-        await WWAnalyzer.syncActiveJobs(syncPayload);
-        await WWStorage.setLastSyncTime(_getTermKey());
+        const syncResult = await WWAnalyzer.syncActiveJobs(syncPayload, _getTermKey(), _isListingFiltered());
+        if (syncResult?.skipped) {
+            _lastSyncedAt = new Date(syncResult.nextSyncAt).getTime() - 30 * 60 * 1000;
+        } else {
+            _lastSyncedAt = Date.now();
+        }
     } catch (_) {}
 
     _scheduleTableSync();
@@ -860,7 +858,11 @@ async function _runDomPhase1() {
 
 async function _runDirectScrapePhase2() {
     const rows = _directScrapeRows;
-    if (!rows?.length) return;
+    if (!rows?.length) {
+        // Rows not populated yet — fall back to waiting for first click.
+        _directScrapeState = 2;
+        return;
+    }
 
     if (!_directDetailTokens.length) {
         _directScrapeState = 2;

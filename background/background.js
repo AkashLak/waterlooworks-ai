@@ -75,7 +75,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return respond(WWApi.createReport(message.feature, message.input, message.output, message.note));
 
         case 'syncActiveJobs':
-            return respond(WWApi.syncActiveJobs(message.rows));
+            return respond(WWApi.syncActiveJobs(message.rows, message.term, message.isFiltered));
 
         case 'searchJobs':
             return respond(_handleSearchJobs(message.criteria));
