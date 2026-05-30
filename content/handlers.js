@@ -13,6 +13,21 @@ let _overlayEl  = null; // injected overlay for cross-page search results
 // Extracts an external application URL from an "Additional Application Information" block.
 // Only returns a URL when "apply" appears in the text leading up to it — avoids picking up
 // informational links like "visit our website at https://..." that aren't application links.
+const SYNC_GATE_MS = 30 * 60 * 1000;
+
+function _getTermKey() {
+    const d = new Date(), m = d.getMonth() + 1, day = d.getDate(), y = d.getFullYear();
+    if ((m === 5 && day >= 11) || m === 6 || m === 7 || (m === 8 && day <= 21)) return `${y}_spring`;
+    if ((m === 9 && day >= 8) || m === 10 || m === 11 || (m === 12 && day <= 23)) return `${y}_fall`;
+    return `${y}_winter`;
+}
+
+function _showSkippedSyncStatus(minsAgo) {
+    const el = document.getElementById('wwai-status-line');
+    if (!el) return;
+    el.textContent = minsAgo === 0 ? 'Synced just now' : `Synced ${minsAgo} min ago`;
+}
+
 function _extractExternalAppUrl(text) {
     for (const match of text.matchAll(/https?:\/\/[^\s,)]+/g)) {
         const before = text.slice(Math.max(0, match.index - 200), match.index).toLowerCase();
@@ -675,6 +690,21 @@ async function _directFetch(url, options, retries = 2) {
 }
 
 async function _runDirectScrapePhase1() {
+    // Gate: skip backend sync if a full sync ran within the last 30 minutes.
+    // Still populate _directScrapeRows from the DOM so Phase 2 knows what jobs exist.
+    const termKey  = _getTermKey();
+    const lastSync = await WWStorage.getLastSyncTime(termKey);
+    if (lastSync && (Date.now() - lastSync) < SYNC_GATE_MS) {
+        const minsAgo = Math.floor((Date.now() - lastSync) / 60000);
+        const domRows = WWScaper.scrapeAllListingRows().filter(r => r.jobId);
+        if (domRows.length) { _directScrapeRows = domRows; _lastKnownTotal = domRows.length; }
+        _showSkippedSyncStatus(minsAgo);
+        _scheduleTableSync();
+        _directScrapeState = 3;
+        _runDirectScrapePhase2();
+        return;
+    }
+
     // If no GET listing token, try POST candidates (Full Cycle SPA navigation).
     // WW loads the All Jobs listing via XHR POST when navigating client-side.
     if (!_directListingToken && _directListingCandidates.length) {
@@ -775,7 +805,10 @@ async function _runDirectScrapePhase1() {
 
     // Sync row-level metadata to backend immediately (no descriptions yet)
     const syncPayload = allRows.map(({ boardUrl, ...r }) => r);
-    try { await WWAnalyzer.syncActiveJobs(syncPayload); } catch (_) {}
+    try {
+        await WWAnalyzer.syncActiveJobs(syncPayload);
+        await WWStorage.setLastSyncTime(_getTermKey());
+    } catch (_) {}
 
     _scheduleTableSync(); // refresh badge injection with newly synced rows
 
@@ -798,10 +831,26 @@ async function _runDomPhase1() {
 
     _directScrapeRows = rows;
     _lastKnownTotal   = rows.length;
+
+    // Gate: skip backend sync if a full sync ran within the last 30 minutes.
+    const termKey  = _getTermKey();
+    const lastSync = await WWStorage.getLastSyncTime(termKey);
+    if (lastSync && (Date.now() - lastSync) < SYNC_GATE_MS) {
+        const minsAgo = Math.floor((Date.now() - lastSync) / 60000);
+        _showSkippedSyncStatus(minsAgo);
+        _scheduleTableSync();
+        _directScrapeState = 3;
+        _runDirectScrapePhase2();
+        return;
+    }
+
     _updateStatusLine(`${rows.length} jobs synced — click any job once to load descriptions`);
 
     const syncPayload = rows.map(({ boardUrl, ...r }) => r);
-    try { await WWAnalyzer.syncActiveJobs(syncPayload); } catch (_) {}
+    try {
+        await WWAnalyzer.syncActiveJobs(syncPayload);
+        await WWStorage.setLastSyncTime(_getTermKey());
+    } catch (_) {}
 
     _scheduleTableSync();
 
