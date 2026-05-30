@@ -331,7 +331,7 @@ async function _onTableChange() {
     }
 
     try {
-        await WWAnalyzer.syncActiveJobs(rowData);
+        await WWAnalyzer.syncActiveJobs(rowData, _getTermKey(), true);
         const response = await WWAnalyzer.getAllJobs();
         const jobs     = response.jobs ?? (Array.isArray(response) ? response : []);
         const jobsMap  = {};
@@ -1131,7 +1131,7 @@ async function _runPeriodicNewJobCheck() {
         // Merge into known rows and sync row-level data
         _directScrapeRows = [...(_directScrapeRows ?? []), ...newRows];
         const syncPayload = newRows.map(({ boardUrl, ...r }) => r);
-        try { await WWAnalyzer.syncActiveJobs(syncPayload); } catch (_) {}
+        try { await WWAnalyzer.syncActiveJobs(syncPayload, _getTermKey(), true); } catch (_) {}
 
         // Fetch descriptions automatically if token is cached from Phase 2
         if (_directHtmlDetailToken && _directDetailBase) {
