@@ -940,7 +940,7 @@ async function _runDomPhase1() {
                 const snapNow = document.querySelector('tr.table__row--body')?.textContent ?? '';
                 if (snapNow && snapNow !== snapBefore) done(true);
             });
-            obs.observe(document.body, { subtree: true, childList: true });
+            obs.observe(document.body, { subtree: true, childList: true, characterData: true });
             // Route through MAIN world — clicking <a href="javascript:void(0);"> from an
             // isolated-world script causes a CSP violation before Vue's handler fires.
             document.dispatchEvent(new CustomEvent('__wwai_paginate', {
