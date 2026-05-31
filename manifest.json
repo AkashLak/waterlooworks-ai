@@ -21,13 +21,19 @@
 
   "content_scripts": [
     {
-      "matches": ["*://waterlooworks.uwaterloo.ca/myAccount/co-op/full/jobs.htm*"],
+      "matches": [
+        "*://waterlooworks.uwaterloo.ca/myAccount/co-op/full/jobs.htm*",
+        "*://waterlooworks.uwaterloo.ca/myAccount/co-op/full/applications.htm*"
+      ],
       "js": ["content/interceptor.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": ["*://waterlooworks.uwaterloo.ca/myAccount/co-op/full/jobs.htm*"],
+      "matches": [
+        "*://waterlooworks.uwaterloo.ca/myAccount/co-op/full/jobs.htm*",
+        "*://waterlooworks.uwaterloo.ca/myAccount/co-op/full/applications.htm*"
+      ],
       "js": [
         "lib/storage.js",
         "lib/scraper.js",
