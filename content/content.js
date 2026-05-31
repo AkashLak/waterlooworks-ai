@@ -365,7 +365,10 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         }
         _directListingToken = token;
         _directListingUrl   = url;
-        if (_directScrapeState === 0) {
+        // State 0: normal first-time run.
+        // State 2: DOM Phase 1 ran first (before token arrived) and scraped only visible rows.
+        //          HTTP Phase 1 can paginate — restart it now that we have the token.
+        if (_directScrapeState === 0 || _directScrapeState === 2) {
             _directScrapeState = 1;
             _runDirectScrapePhase1();
         }
@@ -381,16 +384,21 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         }
     }
 
-    // ── Listing token: read from Performance API ──────────────────────────────
-    // WaterlooWorks fires its own listing GET on page load. By document_idle it's
-    // already in the resource timing entries with the full URL + action token.
+    // ── Listing token detection (three layers, first hit wins) ───────────────
+    //
+    // 1. Performance API scan  — response already arrived before document_idle
+    // 2. DOM dataset fallback  — interceptor writes token at send() time (before response),
+    //                            so this catches slow responses that aren't in perf yet
+    // 3. PerformanceObserver   — response arrives after document_idle
+    //
+    // The `page=` filter is omitted: My Applications initial URL may not include it.
 
     function _scanPerfForListingToken() {
         const ACTION_RE = /[?&]action=([^&\s]+)/;
         for (const entry of performance.getEntriesByType('resource')) {
             const url = entry.name;
             if ((url.includes('/jobs.htm') || url.includes('/applications.htm')) &&
-                 /[?&]page=/.test(url) && ACTION_RE.test(url)) {
+                 ACTION_RE.test(url)) {
                 const m = url.match(ACTION_RE);
                 if (m) { _onListingToken(decodeURIComponent(m[1]), url); return true; }
             }
@@ -399,22 +407,31 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
     }
 
     if (!_scanPerfForListingToken()) {
-        const _listingObserver = new PerformanceObserver((list) => {
-            if (_directListingToken) { _listingObserver.disconnect(); return; }
-            for (const entry of list.getEntries()) {
-                const url = entry.name;
-                if ((url.includes('/jobs.htm') || url.includes('/applications.htm')) &&
-                     /[?&]page=/.test(url) && url.includes('action=')) {
-                    const m = url.match(/[?&]action=([^&\s]+)/);
-                    if (m) {
-                        _onListingToken(decodeURIComponent(m[1]), url);
-                        _listingObserver.disconnect();
-                        return;
+        // Layer 2: read from DOM dataset written by MAIN world interceptor at send() time.
+        // More reliable than the Performance API when the response hasn't arrived yet.
+        if (_root.dataset.wwaiListingToken && _root.dataset.wwaiListingUrl) {
+            _onListingToken(_root.dataset.wwaiListingToken, _root.dataset.wwaiListingUrl);
+        }
+
+        // Layer 3: PerformanceObserver for responses that arrive after document_idle.
+        if (!_directListingToken) {
+            const _listingObserver = new PerformanceObserver((list) => {
+                if (_directListingToken) { _listingObserver.disconnect(); return; }
+                for (const entry of list.getEntries()) {
+                    const url = entry.name;
+                    if ((url.includes('/jobs.htm') || url.includes('/applications.htm')) &&
+                         url.includes('action=')) {
+                        const m = url.match(/[?&]action=([^&\s]+)/);
+                        if (m) {
+                            _onListingToken(decodeURIComponent(m[1]), url);
+                            _listingObserver.disconnect();
+                            return;
+                        }
                     }
                 }
-            }
-        });
-        _listingObserver.observe({ entryTypes: ['resource'] });
+            });
+            _listingObserver.observe({ entryTypes: ['resource'] });
+        }
     }
 
     // The PerformanceObserver disconnects once the first token is found, so page 2+
