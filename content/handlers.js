@@ -924,16 +924,23 @@ async function _runDomPhase1() {
     await new Promise(r => requestAnimationFrame(r));
 
     try {
-        _collectPage(); // page 1
+        const p1 = _collectPage();
+        console.log('[WWAI dom-phase1] page 1 collected:', p1, 'rows');
 
         // Click through remaining pages. Each click updates rows in-place (Vuex, no XHR).
         const MAX_PAGES = 50;
         for (let pg = 2; pg <= MAX_PAGES; pg++) {
             const nextBtn = document.querySelector('a[aria-label="Go to next page"]');
-            if (!nextBtn) break;
+            if (!nextBtn) { console.log('[WWAI dom-phase1] no next button at pg', pg); break; }
             const li = nextBtn.closest('li');
             if (nextBtn.classList.contains('disabled') || li?.classList.contains('disabled') ||
-                nextBtn.getAttribute('aria-disabled') === 'true') break;
+                nextBtn.getAttribute('aria-disabled') === 'true') {
+                console.log('[WWAI dom-phase1] next button disabled at pg', pg,
+                    '| btn.disabled:', nextBtn.classList.contains('disabled'),
+                    '| li.disabled:', !!li?.classList.contains('disabled'),
+                    '| aria-disabled:', nextBtn.getAttribute('aria-disabled'));
+                break;
+            }
 
             const idBefore = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
             // Route through MAIN world — clicking <a href="javascript:void(0);"> from an
