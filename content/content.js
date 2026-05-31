@@ -522,8 +522,19 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
     // content in-place; it does not add new <tr> elements).
     // After all other token-detection layers have had time to run, if we are
     // still tokenless but rows exist in the DOM, start DOM Phase 1 explicitly.
+    // My Applications: rows are server-rendered with client-side pagination.
+    // No XHR is made for the listing, so no token is ever captured and the
+    // MutationObserver "new rows added" check never fires (Vue updates row
+    // content in-place; it does not add new <tr> elements).
+    // After all other token-detection layers have had time to run, if we are
+    // still without an action-token but rows exist in the DOM, start DOM Phase 1.
+    // Note: _directListingUrl may be set to a useless SPA-navigation URL (the
+    // interceptor captures the XHR WW uses to load applications.htm content).
+    // That URL returns HTML, not JSON, so HTTP Phase 1 fails and resets state to 0.
+    // We intentionally do NOT check !_directListingUrl here so we still launch
+    // DOM Phase 1 after HTTP Phase 1 has already given up.
     setTimeout(() => {
-        if (_directScrapeState === 0 && !_directListingToken && !_directListingUrl) {
+        if (_directScrapeState === 0 && !_directListingToken) {
             if (document.querySelector('tr.table__row--body')) {
                 _directScrapeState = 1;
                 _runDomPhase1();

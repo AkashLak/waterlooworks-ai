@@ -834,8 +834,17 @@ async function _runDirectScrapePhase1() {
     }
 
     if (!allRows.length) {
-        _directScrapeState = 0;
-        await _refreshStatus();
+        // HTTP Phase 1 found no usable data (e.g., URL returned HTML not JSON).
+        // Fall through to DOM Phase 1 if rows are already rendered (My Applications).
+        // The 1200ms init timeout may have already fired with state=1 and skipped DOM Phase 1,
+        // so we must retrigger it explicitly here.
+        if (!_directListingToken && document.querySelector('tr.table__row--body')) {
+            _directScrapeState = 1;
+            _runDomPhase1();
+        } else {
+            _directScrapeState = 0;
+            await _refreshStatus();
+        }
         return;
     }
 
@@ -889,8 +898,10 @@ async function _runDomPhase1() {
     // Click through remaining pages. Each click updates rows in-place (Vuex, no XHR).
     const MAX_PAGES = 50;
     for (let pg = 2; pg <= MAX_PAGES; pg++) {
-        // Abort if HTTP Phase 1 kicked in while we were waiting
-        if (_directListingToken || _directListingUrl) break;
+        // Abort only if HTTP Phase 1 has a real action token — meaning it can properly
+        // paginate via JSON API. A bare _directListingUrl (no token) means the interceptor
+        // caught WW's SPA navigation XHR, which returns HTML not JSON and is useless here.
+        if (_directListingToken) break;
 
         const nextBtn = document.querySelector('a[aria-label="Go to next page"]');
         if (!nextBtn) break;
