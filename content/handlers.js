@@ -1005,6 +1005,7 @@ async function _runDomPhase1() {
 
 async function _runDirectScrapePhase2() {
     const rows = _directScrapeRows;
+    console.log('[WWAI phase2] start — rows:', rows?.length, 'tokens:', _directDetailTokens.length, 'state:', _directScrapeState);
     if (!rows?.length) {
         // Rows not populated yet — fall back to waiting for first click.
         _directScrapeState = 2;
@@ -1033,6 +1034,7 @@ async function _runDirectScrapePhase2() {
     } catch (_) {}
 
     const rowsToFetch = rows.filter(r => !describedIds.has(String(r.jobId)));
+    console.log('[WWAI phase2] describedIds:', describedIds.size, 'rowsToFetch:', rowsToFetch.length, 'sampleId:', rowsToFetch[0]?.jobId);
 
     if (!rowsToFetch.length) {
         _directScrapeState = 4;
@@ -1043,6 +1045,7 @@ async function _runDirectScrapePhase2() {
 
     // Find which captured token returns job detail HTML (not the JSON geo-data token)
     const htmlToken = await _findHtmlDetailToken(rowsToFetch[0]);
+    console.log('[WWAI phase2] htmlToken:', htmlToken?.slice(0, 20), 'detailUrl:', _directDetailUrl, 'detailTokens:', _directDetailTokens.length);
     if (!htmlToken) {
         // No detail token available yet — fall back to waiting for the user to click any job.
         // _onDetailToken will restart Phase 2 once a token is captured.
@@ -1168,8 +1171,9 @@ async function _findHtmlDetailToken(sampleRow) {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body,
         });
-        if (!res) continue;
+        if (!res) { console.log('[WWAI findHtmlToken] no response for token', token?.slice(0,20)); continue; }
         const text = await res.text();
+        console.log('[WWAI findHtmlToken] token', token?.slice(0,20), '| hasKVList:', text.includes('tag__key-value-list'), '| first200:', text.slice(0,200));
         if (text.includes('tag__key-value-list')) {
             htmlToken = token;
         } else {
