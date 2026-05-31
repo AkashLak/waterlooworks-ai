@@ -325,9 +325,12 @@ async function _onTableChange() {
     if (!rowData.length) return;
 
     // Detect rows that appeared after Phase 1 ran (new postings, pagination, etc.)
+    // Only sync rows Phase 1 hasn't already handled — avoids bumping last_updated_at on every call.
+    let unseenRows = null; // null means Phase 1 hasn't run yet — fall back to syncing all visible rows
     if (_directScrapeRows) {
         const knownIds = new Set(_directScrapeRows.map(r => r.jobId));
         const newRows  = rowData.filter(r => !knownIds.has(r.jobId));
+        unseenRows = newRows;
         if (newRows.length) {
             _directScrapeRows = [..._directScrapeRows, ...newRows];
             if (_directScrapeState === 4 && _directHtmlDetailToken) {
@@ -341,8 +344,11 @@ async function _onTableChange() {
         }
     }
 
+    // Sync only unseen rows (isFiltered:true bypasses the 30-min gate for incremental writes).
+    // When Phase 1 hasn't run yet (unseenRows === null), sync all visible rows as fallback.
+    const rowsToSync = unseenRows ?? rowData;
     try {
-        await WWAnalyzer.syncActiveJobs(rowData, _getTermKey(), true);
+        if (rowsToSync.length) await WWAnalyzer.syncActiveJobs(rowsToSync, _getTermKey(), true);
         const response = await WWAnalyzer.getAllJobs();
         const jobs     = response.jobs ?? (Array.isArray(response) ? response : []);
         const jobsMap  = {};
