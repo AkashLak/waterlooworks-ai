@@ -913,8 +913,6 @@ async function _runDomPhase1() {
     // Click through remaining pages. Each click updates rows in-place (Vuex, no XHR).
     const MAX_PAGES = 50;
     for (let pg = 2; pg <= MAX_PAGES; pg++) {
-        if (_directListingToken) { console.log('[WWAI dom-phase1] token arrived, stopping'); break; }
-
         const nextBtn = document.querySelector('a[aria-label="Go to next page"]');
         if (!nextBtn) { console.log('[WWAI dom-phase1] no next button at pg', pg); break; }
         const li = nextBtn.closest('li');
