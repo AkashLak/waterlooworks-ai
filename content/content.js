@@ -436,6 +436,7 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
 
     // Layer 2: dataset fallback — interceptor stores the token at send() time (before the
     // response arrives), so this is available even when the Performance API scan missed it.
+    console.log('[WWAI] dataset check — listingToken:', _root.dataset.wwaiListingToken || '(none)', '| listingUrl:', _root.dataset.wwaiListingUrl || '(none)', '| listingCandidates:', _root.dataset.wwaiListingCandidates || '(none)', '| directListingToken after perf scan:', _directListingToken);
     if (!_directListingToken && _root.dataset.wwaiListingToken && _root.dataset.wwaiListingUrl) {
         _onListingToken(_root.dataset.wwaiListingToken, _root.dataset.wwaiListingUrl);
     }

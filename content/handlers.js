@@ -741,10 +741,7 @@ async function _directFetch(url, options, retries = 2) {
 }
 
 async function _runDirectScrapePhase1() {
-    // Gate: skip backend sync if a full sync ran within the last 30 minutes.
-    // Still populate _directScrapeRows from the DOM so Phase 2 knows what jobs exist.
-    // If no GET listing token, try POST candidates (Full Cycle SPA navigation).
-    // WW loads the All Jobs listing via XHR POST when navigating client-side.
+    console.log('[WWAI] Phase1 HTTP start — _directListingToken:', _directListingToken, '| _directListingMethod:', _directListingMethod, '| url:', _directListingUrl, '| candidates:', _directListingCandidates.length);
     if (!_directListingToken && _directListingCandidates.length) {
         const baseUrl = new URL(
             document.documentElement.dataset.wwaiListingCandidateUrl || '/myAccount/co-op/full/jobs.htm',
@@ -870,6 +867,7 @@ async function _runDirectScrapePhase1() {
 // Fast DOM-only Phase 1 — called when the All Jobs table renders after SPA navigation.
 // Skips HTTP candidate trials; scrapes visible rows immediately, then transitions to Phase 2.
 async function _runDomPhase1() {
+    console.log('[WWAI] Phase1 DOM start — _directListingToken:', _directListingToken);
     const rows = WWScaper.scrapeAllListingRows().filter(r => r.jobId);
     if (!rows.length) {
         _directScrapeState = 0;
