@@ -411,9 +411,11 @@ async function _onTableChange() {
 // ── Single-job analysis handlers ───────────────────────────────────────────────
 
 async function _restoreAnalyses(jobId) {
+    _submitting = true;
     _setLoading('Loading analyses…');
     try {
         const result = await WWAnalyzer.getJobAnalyses(jobId);
+        _submitting = false;
         if (result.analysesReady && result.analyses) {
             _currentAnalyses = result.analyses;
             _clearLoading();
@@ -422,7 +424,7 @@ async function _restoreAnalyses(jobId) {
             // Analyses still computing — resume polling
             _startPolling(jobId);
         }
-    } catch (_) { _clearLoading(); }
+    } catch (_) { _submitting = false; _clearLoading(); }
 }
 
 async function _handleFitScore() {
