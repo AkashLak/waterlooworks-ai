@@ -244,8 +244,9 @@ new MutationObserver((mutations) => {
         if (hasNewRows) {
             _scheduleTableSync();
             // Trigger DOM Phase 1 when the All Jobs table first renders after SPA navigation.
-            // Only fall through to DOM scraping if HTTP listing is unavailable (no token AND no raw URL).
-            if (_directScrapeState === 0 && !_directListingToken && !_directListingUrl) {
+            // Fire if state is idle and no token — even if a raw URL was captured, HTTP phase
+            // may have already run and failed (e.g. ESD returns HTML, not JSON).
+            if (_directScrapeState === 0 && !_directListingToken) {
                 _directScrapeState = 1;
                 _runDomPhase1();
             }
