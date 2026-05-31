@@ -250,6 +250,23 @@ new MutationObserver((mutations) => {
                 _runDomPhase1();
             }
         }
+
+        // My Applications DataViewer updates <td> content in-place when the user
+        // manually clicks a pagination button — no new <tr> is added, so hasNewRows
+        // is always false.  Detect the in-place update so we sync the new rows.
+        // Guard: ignore mutations caused by our own badge injections.
+        if (!hasNewRows) {
+            const hasRowUpdate = mutations.some(m =>
+                m.type === 'childList' &&
+                m.target instanceof Element &&
+                !!m.target.closest('tr.table__row--body') &&
+                !Array.from(m.addedNodes).every(n =>
+                    n.nodeType === Node.ELEMENT_NODE &&
+                    n.classList?.contains('wwai-badge')
+                )
+            );
+            if (hasRowUpdate) _scheduleTableSync();
+        }
     }
 }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
 
@@ -498,4 +515,19 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
     // Kick off initial status + table sync after DOM settles
     _refreshStatus();
     _scheduleTableSync();
+
+    // My Applications: rows are server-rendered with client-side pagination.
+    // No XHR is made for the listing, so no token is ever captured and the
+    // MutationObserver "new rows added" check never fires (Vue updates row
+    // content in-place; it does not add new <tr> elements).
+    // After all other token-detection layers have had time to run, if we are
+    // still tokenless but rows exist in the DOM, start DOM Phase 1 explicitly.
+    setTimeout(() => {
+        if (_directScrapeState === 0 && !_directListingToken && !_directListingUrl) {
+            if (document.querySelector('tr.table__row--body')) {
+                _directScrapeState = 1;
+                _runDomPhase1();
+            }
+        }
+    }, 1200);
 })();
