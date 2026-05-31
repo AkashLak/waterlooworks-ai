@@ -741,7 +741,6 @@ async function _directFetch(url, options, retries = 2) {
 }
 
 async function _runDirectScrapePhase1() {
-    console.log('[WWAI] Phase1 HTTP start — _directListingToken:', _directListingToken, '| _directListingMethod:', _directListingMethod, '| url:', _directListingUrl, '| candidates:', _directListingCandidates.length);
     if (!_directListingToken && _directListingCandidates.length) {
         const baseUrl = new URL(
             document.documentElement.dataset.wwaiListingCandidateUrl || '/myAccount/co-op/full/jobs.htm',
@@ -769,16 +768,16 @@ async function _runDirectScrapePhase1() {
     }
 
     // DOM fallback — WW SPA navigation pre-renders the table; no listing GET/POST needed.
-    // Scrape visible rows directly if HTTP listing is unavailable.
+    // Scrape visible rows directly only if HTTP listing is completely unavailable.
     const domFallbackRows = [];
-    if (!_directListingToken) {
+    if (!_directListingToken && !_directListingUrl) {
         await new Promise(r => setTimeout(r, 300)); // let Vue finish rendering
         for (const row of WWScaper.scrapeAllListingRows()) {
             if (row.jobId) domFallbackRows.push(row);
         }
     }
 
-    if (!_directListingToken && !domFallbackRows.length) {
+    if (!_directListingToken && !_directListingUrl && !domFallbackRows.length) {
         _directScrapeState = 0;
         await _refreshStatus();
         return;
@@ -867,7 +866,6 @@ async function _runDirectScrapePhase1() {
 // Fast DOM-only Phase 1 — called when the All Jobs table renders after SPA navigation.
 // Skips HTTP candidate trials; scrapes visible rows immediately, then transitions to Phase 2.
 async function _runDomPhase1() {
-    console.log('[WWAI] Phase1 DOM start — _directListingToken:', _directListingToken);
     const rows = WWScaper.scrapeAllListingRows().filter(r => r.jobId);
     if (!rows.length) {
         _directScrapeState = 0;
@@ -1109,7 +1107,7 @@ async function _fetchGeoData(jobId) {
 // On most ticks nothing changed: 1 API call, returns immediately.
 
 async function _runPeriodicNewJobCheck() {
-    if (!_directListingToken || !_directListingUrl) return;
+    if (!_directListingUrl) return;
     if (_directScrapeState < 4) return; // Phase 2 still running — skip this tick
 
     async function _fetchPeriodicPage(pageNum) {

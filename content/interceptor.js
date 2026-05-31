@@ -46,6 +46,16 @@
         return m ? decodeURIComponent(m[1]) : null;
     }
 
+    // Stores a tokenless listing GET URL so content.js can paginate without an action= token.
+    // My Applications uses GET requests with no action= parameter.
+    function _storeRawListingUrl(url) {
+        const root = document.documentElement;
+        if (!root.dataset.wwaiListingRawUrl) root.dataset.wwaiListingRawUrl = url;
+        document.dispatchEvent(new CustomEvent('__wwai_listing_raw', {
+            detail: JSON.parse(JSON.stringify({ url })),
+        }));
+    }
+
     // ── XMLHttpRequest ────────────────────────────────────────────────────────
 
     const _origOpen = XMLHttpRequest.prototype.open;
@@ -78,6 +88,9 @@
                         _dispatch('listing_candidate', { token, url });
                     }
                 }
+            } else if (method === 'GET') {
+                // No action= token — may be My Applications listing (tokenless GET pagination)
+                _storeRawListingUrl(url);
             }
         }
         return _origSend.apply(this, arguments);
@@ -106,6 +119,8 @@
                         _dispatch('listing_candidate', { token, url });
                     }
                 }
+            } else if (method === 'GET') {
+                _storeRawListingUrl(url);
             }
         }
         return _origFetch.apply(this, arguments);

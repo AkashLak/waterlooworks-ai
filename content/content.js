@@ -244,8 +244,8 @@ new MutationObserver((mutations) => {
         if (hasNewRows) {
             _scheduleTableSync();
             // Trigger DOM Phase 1 when the All Jobs table first renders after SPA navigation.
-            // State 0 = Phase 1 hasn't run yet (HTTP listing not captured).
-            if (_directScrapeState === 0 && !_directListingToken) {
+            // Only fall through to DOM scraping if HTTP listing is unavailable (no token AND no raw URL).
+            if (_directScrapeState === 0 && !_directListingToken && !_directListingUrl) {
                 _directScrapeState = 1;
                 _runDomPhase1();
             }
@@ -374,6 +374,18 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         }
     }
 
+    // Called when a tokenless GET listing URL is captured (e.g. My Applications, no action= param).
+    // Sets up HTTP Phase 1 using the raw URL directly for pagination.
+    function _onListingUrl(url) {
+        if (_directListingUrl) return; // already have a listing URL (token or raw)
+        _directListingUrl    = url;
+        _directListingMethod = 'GET';
+        if (_directScrapeState === 0 || _directScrapeState === 2) {
+            _directScrapeState = 1;
+            _runDirectScrapePhase1();
+        }
+    }
+
     function _onDetailToken(token, url, idParam) {
         if (!_directDetailTokens.includes(token)) _directDetailTokens.push(token);
         if (!_directDetailUrl && url) _directDetailUrl = url;
@@ -395,28 +407,38 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
 
     function _scanPerfForListingToken() {
         const ACTION_RE = /[?&]action=([^&\s]+)/;
+        let rawListingUrl = null;
         for (const entry of performance.getEntriesByType('resource')) {
             const url = entry.name;
-            if ((url.includes('/jobs.htm') || url.includes('/applications.htm')) &&
-                 ACTION_RE.test(url)) {
-                const m = url.match(ACTION_RE);
-                if (m) { _onListingToken(decodeURIComponent(m[1]), url); return true; }
+            if (url.includes('/jobs.htm') || url.includes('/applications.htm')) {
+                if (ACTION_RE.test(url)) {
+                    const m = url.match(ACTION_RE);
+                    if (m) { _onListingToken(decodeURIComponent(m[1]), url); return true; }
+                } else if (!rawListingUrl) {
+                    rawListingUrl = url; // first tokenless listing URL seen
+                }
             }
         }
+        if (rawListingUrl) { _onListingUrl(rawListingUrl); return true; }
         return false;
     }
 
     if (!_scanPerfForListingToken()) {
         // Layer 3: PerformanceObserver for responses that arrive after document_idle.
         const _listingObserver = new PerformanceObserver((list) => {
-            if (_directListingToken) { _listingObserver.disconnect(); return; }
+            if (_directListingUrl) { _listingObserver.disconnect(); return; }
             for (const entry of list.getEntries()) {
                 const url = entry.name;
-                if ((url.includes('/jobs.htm') || url.includes('/applications.htm')) &&
-                     url.includes('action=')) {
-                    const m = url.match(/[?&]action=([^&\s]+)/);
-                    if (m) {
-                        _onListingToken(decodeURIComponent(m[1]), url);
+                if (url.includes('/jobs.htm') || url.includes('/applications.htm')) {
+                    if (url.includes('action=')) {
+                        const m = url.match(/[?&]action=([^&\s]+)/);
+                        if (m) {
+                            _onListingToken(decodeURIComponent(m[1]), url);
+                            _listingObserver.disconnect();
+                            return;
+                        }
+                    } else {
+                        _onListingUrl(url);
                         _listingObserver.disconnect();
                         return;
                     }
@@ -426,19 +448,23 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         _listingObserver.observe({ entryTypes: ['resource'] });
     }
 
-    // The PerformanceObserver disconnects once the first token is found, so page 2+
+    // The PerformanceObserver disconnects once the first URL is found, so page 2+
     // navigation is never detected there.  The MAIN world interceptor fires
-    // __wwai_listing for every listing GET (including page nav) — listen here to catch them.
+    // __wwai_listing for every token listing GET and __wwai_listing_raw for tokenless ones.
     document.addEventListener('__wwai_listing', (e) => _onListingToken(e.detail.token, e.detail.url));
+    document.addEventListener('__wwai_listing_raw', (e) => _onListingUrl(e.detail.url));
 
     // ── Token bootstrap — read DOM dataset written by the MAIN world interceptor ─
     const _root = document.documentElement;
 
     // Layer 2: dataset fallback — interceptor stores the token at send() time (before the
     // response arrives), so this is available even when the Performance API scan missed it.
-    console.log('[WWAI] dataset check — listingToken:', _root.dataset.wwaiListingToken || '(none)', '| listingUrl:', _root.dataset.wwaiListingUrl || '(none)', '| listingCandidates:', _root.dataset.wwaiListingCandidates || '(none)', '| directListingToken after perf scan:', _directListingToken);
     if (!_directListingToken && _root.dataset.wwaiListingToken && _root.dataset.wwaiListingUrl) {
         _onListingToken(_root.dataset.wwaiListingToken, _root.dataset.wwaiListingUrl);
+    }
+    // Tokenless GET fallback — My Applications stores its raw URL here instead of an action= token.
+    if (!_directListingUrl && _root.dataset.wwaiListingRawUrl) {
+        _onListingUrl(_root.dataset.wwaiListingRawUrl);
     }
 
     // POST listing candidates captured before document_idle
