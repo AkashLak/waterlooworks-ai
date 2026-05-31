@@ -1093,14 +1093,16 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body,
                     });
-                    if (!res) return;
+                    if (!res) { if (i === 0) console.log('[WWAI fetchDesc] no res for', row.jobId); return; }
 
                     const html = await _fetchHtmlText(res);
+                    if (i === 0) console.log('[WWAI fetchDesc] jobId:', row.jobId, 'hasKV:', html.includes('tag__key-value-list'), 'htmlLen:', html.length);
                     if (!html.includes('tag__key-value-list')) return;
 
                     const detail = WWScaper.scrapeJobDetailFromHtml(
                         html, row.jobId, row.title, row.organization || row.employer || '', row.division
                     );
+                    if (i === 0) console.log('[WWAI fetchDesc] detail:', detail ? 'ok' : 'null', 'summary:', detail?.jobSummary?.slice(0,50));
                     if (!detail) return;
 
                     const desc = WWScaper.extractJobDescription(detail);
@@ -1131,12 +1133,13 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                         externalUrl:                 _decodeHtml(detail.ifByWebsiteGoTo || detail.ifByEmailSendTo || _extractExternalAppUrl(detail.additionalApplicationInformation || '') || ''),
                     });
                     fetched++;
-                } catch (_) {}
+                } catch (err) { if (i === 0) console.log('[WWAI fetchDesc] caught:', err?.message); }
             })
         );
         _updateStatusLine(`${statusLabel}… ${fetched}/${total} fetched`);
     }
 
+    console.log('[WWAI fetchDesc] done — jobDatas.length:', jobDatas.length, 'fetched:', fetched, 'total:', total);
     if (!jobDatas.length) {
         _updateStatusLine('No descriptions fetched');
         return;
