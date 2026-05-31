@@ -923,22 +923,31 @@ async function _runDomPhase1() {
         if (nextBtn.classList.contains('disabled') || li?.classList.contains('disabled') ||
             nextBtn.getAttribute('aria-disabled') === 'true') break;
 
-        // Snapshot first row text to detect when DataViewer updates the table
-        const snapBefore = document.querySelector('tr.table__row--body')?.textContent ?? '';
-        // Route through MAIN world — clicking <a href="javascript:void(0);"> from an
-        // isolated-world script causes a CSP violation before Vue's handler fires.
-        document.dispatchEvent(new CustomEvent('__wwai_paginate', {
-            detail: { selector: 'a[aria-label="Go to next page"]' },
-        }));
-
-        // Poll until row content changes (client-side update, typically < 200ms)
-        let changed = false;
-        const deadline = Date.now() + 2500;
-        while (Date.now() < deadline) {
-            await new Promise(r => setTimeout(r, 100));
-            const snapNow = document.querySelector('tr.table__row--body')?.textContent ?? '';
-            if (snapNow && snapNow !== snapBefore) { changed = true; break; }
-        }
+        // Use a MutationObserver set up BEFORE dispatching the event so we can't
+        // miss the in-place DOM update that Vue makes when DataViewer re-renders.
+        const changed = await new Promise(resolve => {
+            let settled = false;
+            let t;
+            const done = (val) => {
+                if (settled) return;
+                settled = true;
+                obs.disconnect();
+                clearTimeout(t);
+                resolve(val);
+            };
+            const snapBefore = document.querySelector('tr.table__row--body')?.textContent ?? '';
+            const obs = new MutationObserver(() => {
+                const snapNow = document.querySelector('tr.table__row--body')?.textContent ?? '';
+                if (snapNow && snapNow !== snapBefore) done(true);
+            });
+            obs.observe(document.body, { subtree: true, childList: true });
+            // Route through MAIN world — clicking <a href="javascript:void(0);"> from an
+            // isolated-world script causes a CSP violation before Vue's handler fires.
+            document.dispatchEvent(new CustomEvent('__wwai_paginate', {
+                detail: { selector: 'a[aria-label="Go to next page"]' },
+            }));
+            t = setTimeout(() => done(false), 3000);
+        });
         if (!changed) break;
 
         const added = _collectPage();
