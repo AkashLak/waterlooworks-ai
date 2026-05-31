@@ -827,13 +827,15 @@ async function _runDirectScrapePhase1() {
         // Page-exhaustion loop: fetch until WW returns an empty page.
         // totalResults is not used for stopping — WW listing types return it inconsistently
         // (e.g. My Applications sets totalResults to the per-page count, not the grand total).
+        console.log('[WWAI http-phase1] starting — token:', _directListingToken?.slice(0,20), 'url:', _directListingUrl, 'method:', _directListingMethod);
         while (page <= MAX_PAGES) {
             const res = await _fetchListingPage(page);
-            if (!res) break;
+            if (!res) { console.log('[WWAI http-phase1] pg', page, 'no response'); break; }
 
             let json;
-            try { json = await res.json(); } catch (e) { break; }
+            try { json = await res.json(); } catch (e) { console.log('[WWAI http-phase1] pg', page, 'JSON parse failed:', e.message); break; }
 
+            console.log('[WWAI http-phase1] pg', page, 'keys:', Object.keys(json), 'data.length:', json.data?.length ?? 'N/A');
             if (!json.data?.length) break;
 
             let addedThisPage = 0;
@@ -841,18 +843,18 @@ async function _runDirectScrapePhase1() {
                 const row = WWScaper.parseListingRow(apiRow);
                 if (row.jobId) { allRows.push(row); addedThisPage++; }
             }
+            console.log('[WWAI http-phase1] pg', page, 'added', addedThisPage, 'total:', allRows.length);
             if (!addedThisPage) break;
 
             page++;
         }
     }
 
+    console.log('[WWAI phase1] allRows.length:', allRows.length, 'domFallback:', domFallbackRows.length);
     if (!allRows.length) {
-        // HTTP Phase 1 found no usable data (e.g., URL returned HTML not JSON).
-        // Fall through to DOM Phase 1 if rows are already rendered (My Applications).
-        // The 1200ms init timeout may have already fired with state=1 and skipped DOM Phase 1,
-        // so we must retrigger it explicitly here.
-        if (document.querySelector('tr.table__row--body')) {
+        const hasRows = !!document.querySelector('tr.table__row--body');
+        console.log('[WWAI phase1] fallback — hasRows:', hasRows, 'token:', _directListingToken?.slice(0,20));
+        if (hasRows) {
             _directScrapeState = 1;
             _runDomPhase1();
         } else {
@@ -922,12 +924,17 @@ async function _runDomPhase1() {
     await new Promise(r => requestAnimationFrame(r));
 
     try {
-        _collectPage();
+        const p1 = _collectPage();
+        console.log('[WWAI dom-phase1] page 1 collected:', p1, 'rows');
 
         // Click through remaining pages. Each click updates rows in-place (Vuex, no XHR).
         const MAX_PAGES = 50;
         for (let pg = 2; pg <= MAX_PAGES; pg++) {
             const nextBtn = document.querySelector('a[aria-label="Go to next page"]');
+            console.log('[WWAI dom-phase1] pg', pg, 'nextBtn:', nextBtn ? 'found' : 'NOT FOUND',
+                nextBtn ? '| disabled:', nextBtn.classList.contains('disabled'),
+                '| li.disabled:', !!nextBtn?.closest('li')?.classList.contains('disabled'),
+                '| aria-disabled:', nextBtn?.getAttribute('aria-disabled') : '');
             if (!nextBtn) break;
             const li = nextBtn.closest('li');
             if (nextBtn.classList.contains('disabled') || li?.classList.contains('disabled') ||
@@ -936,6 +943,7 @@ async function _runDomPhase1() {
             }
 
             const idBefore = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
+            console.log('[WWAI dom-phase1] pg', pg, 'idBefore:', idBefore, '— dispatching paginate');
             // Route through MAIN world — clicking <a href="javascript:void(0);"> from an
             // isolated-world script causes a CSP violation before Vue's handler fires.
             document.dispatchEvent(new CustomEvent('__wwai_paginate', {
@@ -952,9 +960,11 @@ async function _runDomPhase1() {
                 const idNow = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
                 if (idNow && idNow !== idBefore) { flipped = true; break; }
             }
+            console.log('[WWAI dom-phase1] pg', pg, 'flipped:', flipped);
             if (!flipped) break;
 
             const added = _collectPage();
+            console.log('[WWAI dom-phase1] pg', pg, 'added:', added, 'total:', allRows.length);
             if (!added) break;
         }
 
