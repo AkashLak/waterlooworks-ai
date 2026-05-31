@@ -1227,16 +1227,21 @@ function _showSearchOverlay(jobs, query, emptyMsg) {
         table.appendChild(thead);
 
         const tbody = document.createElement('tbody');
+        tbody.addEventListener('click', (e) => {
+            const row = e.target.closest('.wwai-overlay-row[data-job-id]');
+            if (row) _openJobFromOverlay(row.dataset.jobId);
+        });
+
         for (const job of jobs) {
             const jobId = String(job.jobId ?? job.id ?? '');
             const tr = document.createElement('tr');
             tr.className = 'wwai-overlay-row';
+            if (jobId) tr.dataset.jobId = jobId;
 
             const tdTitle = document.createElement('td');
-            const titleBtn = document.createElement('button');
+            const titleBtn = document.createElement('span');
             titleBtn.className = 'wwai-overlay-title-btn';
             titleBtn.textContent = job.title ?? '';
-            if (jobId) titleBtn.addEventListener('click', () => _openJobFromOverlay(jobId));
             tdTitle.appendChild(titleBtn);
 
             const tdEmp = document.createElement('td');
@@ -1283,9 +1288,18 @@ function _hideSearchOverlay() {
 
 function _openJobFromOverlay(jobId) {
     if (!jobId) return;
-    // Always dispatch to the MAIN world — WW title links use javascript: hrefs which
-    // Chrome blocks when clicked programmatically from extension context (CSP violation).
-    // viewPosting() called natively from interceptor.js is exempt from that restriction.
+    _clearTableFilter(); // close overlay first so the WW table and modal are visible
+
+    // If the job row is on the current WW page, click its title link directly.
+    // This is the most reliable path — WW's own click handler opens the modal.
+    const row = WWScaper.scrapeRowByJobId(jobId);
+    if (row?.titleEl) {
+        row.titleEl.click();
+        return;
+    }
+
+    // Job is on a different page — dispatch to MAIN world so interceptor.js can call
+    // WW's native viewPosting(), which loads the modal without page navigation.
     document.dispatchEvent(new CustomEvent('__wwai_open_job', { detail: { postingId: jobId } }));
 }
 

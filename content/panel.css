@@ -390,28 +390,26 @@
 }
 .wwai-overlay-row {
     border-bottom: 1px solid #ebebeb;
-    transition: background 0.08s;
+    transition: background 0.1s;
+    cursor: pointer;
 }
-.wwai-overlay-row:hover { background: #fafafa; }
+.wwai-overlay-row:hover { background: #eef3ff; }
+.wwai-overlay-row:hover .wwai-overlay-title-btn { color: #0e3f9e; text-decoration-color: #0e3f9e; }
+.wwai-overlay-row:active { background: #dde8ff; }
 .wwai-overlay-row td {
-    padding: 9px 16px;
+    padding: 10px 16px;
     vertical-align: middle;
     color: #1a1a1a;
 }
 .wwai-overlay-title-btn {
-    background: none;
-    border: none;
     color: #1a5fcb;
     font-size: 13px;
     font-weight: 600;
-    cursor: pointer;
     font-family: inherit;
-    text-align: left;
-    padding: 0;
     text-decoration: underline;
     text-underline-offset: 2px;
+    text-decoration-color: #a8c4f5;
 }
-.wwai-overlay-title-btn:hover { color: #0e3f9e; }
 
 .wwai-overlay-badge {
     display: inline-block;
