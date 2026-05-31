@@ -741,6 +741,7 @@ async function _directFetch(url, options, retries = 2) {
 }
 
 async function _runDirectScrapePhase1() {
+    console.log('[WWAI-DIAG] Phase1 start — token:', _directListingToken, '| url:', _directListingUrl, '| method:', _directListingMethod);
     if (!_directListingToken && _directListingCandidates.length) {
         const baseUrl = new URL(
             document.documentElement.dataset.wwaiListingCandidateUrl || '/myAccount/co-op/full/jobs.htm',
@@ -815,18 +816,22 @@ async function _runDirectScrapePhase1() {
         // (e.g. My Applications sets totalResults to the per-page count, not the grand total).
         while (page <= MAX_PAGES) {
             const res = await _fetchListingPage(page);
+            console.log('[WWAI-DIAG] Page', page, 'fetch result:', res ? `${res.status} ${res.statusText}` : 'null');
             if (!res) break;
 
+            const rawText = await res.text();
+            console.log('[WWAI-DIAG] Page', page, 'response (first 200 chars):', rawText.slice(0, 200));
             let json;
-            try { json = await res.json(); } catch { break; }
+            try { json = JSON.parse(rawText); } catch { console.log('[WWAI-DIAG] Page', page, 'JSON parse failed'); break; }
 
-            if (!json.data?.length) break;
+            if (!json.data?.length) { console.log('[WWAI-DIAG] Page', page, 'no json.data, keys:', Object.keys(json).join(',')); break; }
 
             let addedThisPage = 0;
             for (const apiRow of json.data) {
                 const row = WWScaper.parseListingRow(apiRow);
                 if (row.jobId) { allRows.push(row); addedThisPage++; }
             }
+            console.log('[WWAI-DIAG] Page', page, 'added', addedThisPage, 'rows, total so far:', allRows.length);
             if (!addedThisPage) break; // page had data but no valid job IDs
 
             page++;
@@ -866,6 +871,7 @@ async function _runDirectScrapePhase1() {
 // Fast DOM-only Phase 1 — called when the All Jobs table renders after SPA navigation.
 // Skips HTTP candidate trials; scrapes visible rows immediately, then transitions to Phase 2.
 async function _runDomPhase1() {
+    console.log('[WWAI-DIAG] DOM Phase1 running — no HTTP listing URL was captured');
     const rows = WWScaper.scrapeAllListingRows().filter(r => r.jobId);
     if (!rows.length) {
         _directScrapeState = 0;

@@ -65,6 +65,10 @@
         if (typeof url === 'string' && WW_BOARD_RE.test(url)) {
             this._wwai = { method: method.toUpperCase(), url };
         }
+        // Diagnostic: log ALL XHR requests so we can see what URL WW uses for listing data
+        if (typeof url === 'string' && url.includes('waterlooworks') || typeof url === 'string' && url.startsWith('/')) {
+            console.log('[WWAI-DIAG] XHR open:', method.toUpperCase(), url.slice(0, 120));
+        }
         return _origOpen.apply(this, arguments);
     };
 
