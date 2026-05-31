@@ -931,12 +931,13 @@ async function _runDomPhase1() {
         const MAX_PAGES = 50;
         for (let pg = 2; pg <= MAX_PAGES; pg++) {
             const nextBtn = document.querySelector('a[aria-label="Go to next page"]');
-            console.log('[WWAI dom-phase1] pg', pg, 'nextBtn:', nextBtn ? 'found' : 'NOT FOUND',
-                nextBtn ? '| disabled:', nextBtn.classList.contains('disabled'),
-                '| li.disabled:', !!nextBtn?.closest('li')?.classList.contains('disabled'),
-                '| aria-disabled:', nextBtn?.getAttribute('aria-disabled') : '');
+            const li = nextBtn?.closest('li');
+            console.log('[WWAI dom-phase1] pg', pg,
+                'nextBtn:', nextBtn ? 'found' : 'NOT FOUND',
+                '| btn.disabled:', nextBtn?.classList.contains('disabled'),
+                '| li.disabled:', !!li?.classList.contains('disabled'),
+                '| aria-disabled:', nextBtn?.getAttribute('aria-disabled'));
             if (!nextBtn) break;
-            const li = nextBtn.closest('li');
             if (nextBtn.classList.contains('disabled') || li?.classList.contains('disabled') ||
                 nextBtn.getAttribute('aria-disabled') === 'true') {
                 break;
