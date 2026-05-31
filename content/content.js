@@ -407,31 +407,23 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
     }
 
     if (!_scanPerfForListingToken()) {
-        // Layer 2: read from DOM dataset written by MAIN world interceptor at send() time.
-        // More reliable than the Performance API when the response hasn't arrived yet.
-        if (_root.dataset.wwaiListingToken && _root.dataset.wwaiListingUrl) {
-            _onListingToken(_root.dataset.wwaiListingToken, _root.dataset.wwaiListingUrl);
-        }
-
         // Layer 3: PerformanceObserver for responses that arrive after document_idle.
-        if (!_directListingToken) {
-            const _listingObserver = new PerformanceObserver((list) => {
-                if (_directListingToken) { _listingObserver.disconnect(); return; }
-                for (const entry of list.getEntries()) {
-                    const url = entry.name;
-                    if ((url.includes('/jobs.htm') || url.includes('/applications.htm')) &&
-                         url.includes('action=')) {
-                        const m = url.match(/[?&]action=([^&\s]+)/);
-                        if (m) {
-                            _onListingToken(decodeURIComponent(m[1]), url);
-                            _listingObserver.disconnect();
-                            return;
-                        }
+        const _listingObserver = new PerformanceObserver((list) => {
+            if (_directListingToken) { _listingObserver.disconnect(); return; }
+            for (const entry of list.getEntries()) {
+                const url = entry.name;
+                if ((url.includes('/jobs.htm') || url.includes('/applications.htm')) &&
+                     url.includes('action=')) {
+                    const m = url.match(/[?&]action=([^&\s]+)/);
+                    if (m) {
+                        _onListingToken(decodeURIComponent(m[1]), url);
+                        _listingObserver.disconnect();
+                        return;
                     }
                 }
-            });
-            _listingObserver.observe({ entryTypes: ['resource'] });
-        }
+            }
+        });
+        _listingObserver.observe({ entryTypes: ['resource'] });
     }
 
     // The PerformanceObserver disconnects once the first token is found, so page 2+
@@ -441,6 +433,12 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
 
     // ── Token bootstrap — read DOM dataset written by the MAIN world interceptor ─
     const _root = document.documentElement;
+
+    // Layer 2: dataset fallback — interceptor stores the token at send() time (before the
+    // response arrives), so this is available even when the Performance API scan missed it.
+    if (!_directListingToken && _root.dataset.wwaiListingToken && _root.dataset.wwaiListingUrl) {
+        _onListingToken(_root.dataset.wwaiListingToken, _root.dataset.wwaiListingUrl);
+    }
 
     // POST listing candidates captured before document_idle
     if (_root.dataset.wwaiListingCandidates) {
