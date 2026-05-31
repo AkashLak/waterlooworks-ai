@@ -16,7 +16,7 @@ let _activeFilter      = null; // Set of jobIds when table filter is active, nul
 let _filterMeta        = null; // { shown, total, query } for filter card restoration
 let _lastRenderedMode  = null; // last rendered result mode — used by report feature
 let _lastRenderedData  = null; // last rendered result data — used by report feature
-let _allJobsMap        = {};   // latest getAllJobs snapshot — fallback for qa_disguise in panel
+let _allJobsMap        = {};   // latest getAllJobs snapshot — fallback for role_disguise in panel
 
 // ── Direct HTTP scrape state (populated by MAIN world interceptor) ─────────────
 let _directListingToken      = null;  // action token for the listing endpoint (GET or POST)

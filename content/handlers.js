@@ -262,9 +262,9 @@ function _showSniffFlag(qa) {
 
 function _renderAnalysesReady() {
     // Show sniff flag whenever alternate titles exist — collapsed by default, expands on click
-    // Fall back to the allJobsMap snapshot if the analyses response didn't include qa_disguise
-    const qa = _currentAnalyses?.qa_disguise
-            ?? _allJobsMap[_currentJobId]?.qa_disguise
+    // Fall back to the allJobsMap snapshot if the analyses response didn't include role_disguise
+    const qa = _currentAnalyses?.role_disguise
+            ?? _allJobsMap[_currentJobId]?.role_disguise
             ?? null;
     if (_qaHasAlternateTitles(qa)) {
         _showSniffFlag(qa);
@@ -346,7 +346,7 @@ async function _onTableChange() {
         if (_currentJobId) {
             const flag = document.getElementById('wwai-sniff-flag');
             if (flag && flag.classList.contains('wwai-hidden')) {
-                const qa = _allJobsMap[_currentJobId]?.qa_disguise ?? null;
+                const qa = _allJobsMap[_currentJobId]?.role_disguise ?? null;
                 if (_qaHasAlternateTitles(qa)) _showSniffFlag(qa);
             }
         }
@@ -409,7 +409,7 @@ async function _handlePrecomputed(mode) {
     if (mode === 'DREAM_JOB') { await _handleDreamFit(); return; }
     const cached = _getCached(_currentJobId, mode);
     if (cached) { _renderResult(mode, cached); return; }
-    const KEY_MAP = { QA_SNIFF: 'qa_disguise', ROLE_EXPLAINER: 'role_explainer' };
+    const KEY_MAP = { QA_SNIFF: 'role_disguise', ROLE_EXPLAINER: 'role_explainer' };
     const key = KEY_MAP[mode];
     const data = key && _currentAnalyses ? _currentAnalyses[key] : null;
     if (data) { _setCached(_currentJobId, mode, data); _renderResult(mode, data); }
@@ -477,7 +477,7 @@ async function _handleShouldIApply() {
         }
 
         const dream = _currentAnalyses?.dream_job ?? null;
-        const qa    = _currentAnalyses?.qa_disguise ?? null;
+        const qa    = _currentAnalyses?.role_disguise ?? null;
         _renderResult('SHOULD_APPLY', { fit, dream, qa });
     } catch (err) { _renderError(err); }
     finally { _clearLoading(); }
