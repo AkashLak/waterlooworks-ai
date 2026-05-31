@@ -907,51 +907,47 @@ async function _runDomPhase1() {
         return added;
     }
 
-    _collectPage(); // page 1
+    const p1count = _collectPage();
+    console.log('[WWAI dom-phase1] page 1 collected:', p1count, 'rows');
 
     // Click through remaining pages. Each click updates rows in-place (Vuex, no XHR).
     const MAX_PAGES = 50;
     for (let pg = 2; pg <= MAX_PAGES; pg++) {
-        // Abort only if HTTP Phase 1 has a real action token — meaning it can properly
-        // paginate via JSON API. A bare _directListingUrl (no token) means the interceptor
-        // caught WW's SPA navigation XHR, which returns HTML not JSON and is useless here.
-        if (_directListingToken) break;
+        if (_directListingToken) { console.log('[WWAI dom-phase1] token arrived, stopping'); break; }
 
         const nextBtn = document.querySelector('a[aria-label="Go to next page"]');
-        if (!nextBtn) break;
+        if (!nextBtn) { console.log('[WWAI dom-phase1] no next button at pg', pg); break; }
         const li = nextBtn.closest('li');
         if (nextBtn.classList.contains('disabled') || li?.classList.contains('disabled') ||
-            nextBtn.getAttribute('aria-disabled') === 'true') break;
+            nextBtn.getAttribute('aria-disabled') === 'true') {
+            console.log('[WWAI dom-phase1] next button disabled at pg', pg);
+            break;
+        }
 
-        // Wait for Vue to re-render page 2 rows. Compare the first row's job ID
-        // (not textContent) so badge injections running concurrently don't
-        // falsely trigger done(true) while we're still on page 1.
-        const changed = await new Promise(resolve => {
-            let settled = false;
-            let t;
-            const done = (val) => {
-                if (settled) return;
-                settled = true;
-                obs.disconnect();
-                clearTimeout(t);
-                resolve(val);
-            };
-            const idBefore = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
-            const obs = new MutationObserver(() => {
-                const idNow = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
-                if (idNow && idNow !== idBefore) done(true);
-            });
-            obs.observe(document.body, { subtree: true, childList: true, characterData: true });
-            // Route through MAIN world — clicking <a href="javascript:void(0);"> from an
-            // isolated-world script causes a CSP violation before Vue's handler fires.
-            document.dispatchEvent(new CustomEvent('__wwai_paginate', {
-                detail: { selector: 'a[aria-label="Go to next page"]' },
-            }));
-            t = setTimeout(() => done(false), 3000);
-        });
-        if (!changed) break;
+        const idBefore = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
+        console.log('[WWAI dom-phase1] navigating to pg', pg, '| first-row id before:', idBefore);
+        // Route through MAIN world — clicking <a href="javascript:void(0);"> from an
+        // isolated-world script causes a CSP violation before Vue's handler fires.
+        document.dispatchEvent(new CustomEvent('__wwai_paginate', {
+            detail: { selector: 'a[aria-label="Go to next page"]' },
+        }));
+
+        // Poll until the first visible row's job ID changes.
+        // Using job ID (not textContent) so concurrent badge injections don't
+        // cause a false positive while we're still on the same page.
+        let flipped = false;
+        const deadline = Date.now() + 3000;
+        while (Date.now() < deadline) {
+            await new Promise(r => setTimeout(r, 150));
+            const idNow = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
+            if (idNow && idNow !== idBefore) { flipped = true; break; }
+        }
+        console.log('[WWAI dom-phase1] pg', pg, 'flip:', flipped,
+                    '| first-row id now:', WWScaper.scrapeAllListingRows()[0]?.jobId ?? '(none)');
+        if (!flipped) break;
 
         const added = _collectPage();
+        console.log('[WWAI dom-phase1] pg', pg, 'added', added, 'new rows — total:', allRows.length);
         if (!added) break;
     }
 
