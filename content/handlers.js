@@ -741,7 +741,6 @@ async function _directFetch(url, options, retries = 2) {
 }
 
 async function _runDirectScrapePhase1() {
-    console.log('[WWAI-DIAG] Phase1 start — token:', _directListingToken, '| url:', _directListingUrl, '| method:', _directListingMethod);
     if (!_directListingToken && _directListingCandidates.length) {
         const baseUrl = new URL(
             document.documentElement.dataset.wwaiListingCandidateUrl || '/myAccount/co-op/full/jobs.htm',
@@ -816,23 +815,19 @@ async function _runDirectScrapePhase1() {
         // (e.g. My Applications sets totalResults to the per-page count, not the grand total).
         while (page <= MAX_PAGES) {
             const res = await _fetchListingPage(page);
-            console.log('[WWAI-DIAG] Page', page, 'fetch result:', res ? `${res.status} ${res.statusText}` : 'null');
             if (!res) break;
 
-            const rawText = await res.text();
-            console.log('[WWAI-DIAG] Page', page, 'response (first 200 chars):', rawText.slice(0, 200));
             let json;
-            try { json = JSON.parse(rawText); } catch { console.log('[WWAI-DIAG] Page', page, 'JSON parse failed'); break; }
+            try { json = await res.json(); } catch { break; }
 
-            if (!json.data?.length) { console.log('[WWAI-DIAG] Page', page, 'no json.data, keys:', Object.keys(json).join(',')); break; }
+            if (!json.data?.length) break;
 
             let addedThisPage = 0;
             for (const apiRow of json.data) {
                 const row = WWScaper.parseListingRow(apiRow);
                 if (row.jobId) { allRows.push(row); addedThisPage++; }
             }
-            console.log('[WWAI-DIAG] Page', page, 'added', addedThisPage, 'rows, total so far:', allRows.length);
-            if (!addedThisPage) break; // page had data but no valid job IDs
+            if (!addedThisPage) break;
 
             page++;
         }
@@ -868,22 +863,79 @@ async function _runDirectScrapePhase1() {
     _runDirectScrapePhase2();
 }
 
-// Fast DOM-only Phase 1 — called when the All Jobs table renders after SPA navigation.
-// Skips HTTP candidate trials; scrapes visible rows immediately, then transitions to Phase 2.
+// DOM-based Phase 1 for pages without an HTTP listing token (e.g. My Applications).
+// WW My Applications renders all data server-side — DataViewer paginates client-side with
+// no XHR requests. We click through WW's own pagination UI to collect all pages.
 async function _runDomPhase1() {
-    console.log('[WWAI-DIAG] DOM Phase1 running — no HTTP listing URL was captured');
-    const rows = WWScaper.scrapeAllListingRows().filter(r => r.jobId);
-    if (!rows.length) {
+    await new Promise(r => setTimeout(r, 400)); // let Vue finish initial render
+
+    const seenIds = new Set();
+    const allRows = [];
+
+    function _collectPage() {
+        let added = 0;
+        for (const row of WWScaper.scrapeAllListingRows()) {
+            if (row.jobId && !seenIds.has(row.jobId)) {
+                seenIds.add(row.jobId);
+                allRows.push(row);
+                added++;
+            }
+        }
+        return added;
+    }
+
+    _collectPage(); // page 1
+
+    // Click through remaining pages. Each click updates rows in-place (Vuex, no XHR).
+    const MAX_PAGES = 50;
+    for (let pg = 2; pg <= MAX_PAGES; pg++) {
+        // Abort if HTTP Phase 1 kicked in while we were waiting
+        if (_directListingToken || _directListingUrl) break;
+
+        const nextBtn = document.querySelector('a[aria-label="Go to next page"]');
+        if (!nextBtn) break;
+        const li = nextBtn.closest('li');
+        if (nextBtn.classList.contains('disabled') || li?.classList.contains('disabled') ||
+            nextBtn.getAttribute('aria-disabled') === 'true') break;
+
+        // Snapshot first row text to detect when DataViewer updates the table
+        const snapBefore = document.querySelector('tr.table__row--body')?.textContent ?? '';
+        nextBtn.click();
+
+        // Poll until row content changes (client-side update, typically < 200ms)
+        let changed = false;
+        const deadline = Date.now() + 2500;
+        while (Date.now() < deadline) {
+            await new Promise(r => setTimeout(r, 100));
+            const snapNow = document.querySelector('tr.table__row--body')?.textContent ?? '';
+            if (snapNow && snapNow !== snapBefore) { changed = true; break; }
+        }
+        if (!changed) break;
+
+        const added = _collectPage();
+        if (!added) break;
+    }
+
+    // Return user to page 1 for clean UX
+    const firstPageBtn =
+        document.querySelector('a[aria-label="Go to first page"]') ??
+        [...document.querySelectorAll('a.pagination__link')]
+            .find(a => a.textContent.trim() === '1' &&
+                       !a.classList.contains('disabled') &&
+                       !a.closest('li')?.classList.contains('disabled'));
+    if (firstPageBtn) firstPageBtn.click();
+
+    if (!allRows.length) {
         _directScrapeState = 0;
         return;
     }
 
-    _directScrapeRows = rows;
-    _lastKnownTotal   = rows.length;
+    _directScrapeRows = allRows;
+    _lastKnownTotal   = allRows.length;
 
-    _updateStatusLine(`${rows.length} jobs synced — click any job once to load descriptions`);
+    _updateStatusLine(`${allRows.length} jobs synced — click any job once to load descriptions`);
 
-    const syncPayload = rows.map(({ boardUrl, ...r }) => r);
+    const syncPayload = allRows.map(({ boardUrl, ...r }) => r);
     try {
         const syncResult = await WWAnalyzer.syncActiveJobs(syncPayload, _getTermKey(), _isListingFiltered());
         if (syncResult?.skipped) {
