@@ -946,7 +946,7 @@ async function _runDomPhase1() {
             let flipped = false;
             const deadline = Date.now() + 3000;
             while (Date.now() < deadline) {
-                await new Promise(r => setTimeout(r, 150));
+                await new Promise(r => setTimeout(r, 50));
                 const idNow = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
                 if (idNow && idNow !== idBefore) { flipped = true; break; }
             }
