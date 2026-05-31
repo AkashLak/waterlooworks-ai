@@ -923,8 +923,9 @@ async function _runDomPhase1() {
         if (nextBtn.classList.contains('disabled') || li?.classList.contains('disabled') ||
             nextBtn.getAttribute('aria-disabled') === 'true') break;
 
-        // Use a MutationObserver set up BEFORE dispatching the event so we can't
-        // miss the in-place DOM update that Vue makes when DataViewer re-renders.
+        // Wait for Vue to re-render page 2 rows. Compare the first row's job ID
+        // (not textContent) so badge injections running concurrently don't
+        // falsely trigger done(true) while we're still on page 1.
         const changed = await new Promise(resolve => {
             let settled = false;
             let t;
@@ -935,10 +936,10 @@ async function _runDomPhase1() {
                 clearTimeout(t);
                 resolve(val);
             };
-            const snapBefore = document.querySelector('tr.table__row--body')?.textContent ?? '';
+            const idBefore = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
             const obs = new MutationObserver(() => {
-                const snapNow = document.querySelector('tr.table__row--body')?.textContent ?? '';
-                if (snapNow && snapNow !== snapBefore) done(true);
+                const idNow = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
+                if (idNow && idNow !== idBefore) done(true);
             });
             obs.observe(document.body, { subtree: true, childList: true, characterData: true });
             // Route through MAIN world — clicking <a href="javascript:void(0);"> from an
