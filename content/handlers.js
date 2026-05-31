@@ -813,26 +813,24 @@ async function _runDirectScrapePhase1() {
         let total = Infinity; // stays Infinity if API omits a total field → page-exhaust loop
         const MAX_PAGES = 60;
 
-        while (allRows.length < total && page <= MAX_PAGES) {
+        // Page-exhaustion loop: fetch until WW returns an empty page.
+        // totalResults is not used for stopping — WW listing types return it inconsistently
+        // (e.g. My Applications sets totalResults to the per-page count, not the grand total).
+        while (page <= MAX_PAGES) {
             const res = await _fetchListingPage(page);
             if (!res) break;
 
             let json;
             try { json = await res.json(); } catch { break; }
 
-            if (total === Infinity) {
-                // WW uses different field names across listing types (jobs vs. applications).
-                // Keep Infinity if none found — empty-page detection will stop the loop.
-                const t = json.totalResults ?? json.total ?? json.totalCount ?? null;
-                if (t != null && t > 0) total = t;
-            }
-
             if (!json.data?.length) break;
 
+            let addedThisPage = 0;
             for (const apiRow of json.data) {
                 const row = WWScaper.parseListingRow(apiRow);
-                if (row.jobId) allRows.push(row);
+                if (row.jobId) { allRows.push(row); addedThisPage++; }
             }
+            if (!addedThisPage) break; // page had data but no valid job IDs
 
             page++;
         }

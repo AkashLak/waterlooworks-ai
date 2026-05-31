@@ -356,7 +356,13 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
     // listen for future events (handles tokens captured after init).
 
     function _onListingToken(token, url) {
-        if (_directListingToken) return; // only use the first capture
+        if (_directListingToken) {
+            // WW navigated to a different page of the same listing.
+            // My Applications pagination reuses existing <tr> elements (updates content in-place)
+            // so the MutationObserver "new row added" check never fires — schedule a sync here.
+            if (url !== _directListingUrl) _scheduleTableSync();
+            return;
+        }
         _directListingToken = token;
         _directListingUrl   = url;
         if (_directScrapeState === 0) {
