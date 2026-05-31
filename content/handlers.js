@@ -829,12 +829,11 @@ async function _runDirectScrapePhase1() {
         // (e.g. My Applications sets totalResults to the per-page count, not the grand total).
         while (page <= MAX_PAGES) {
             const res = await _fetchListingPage(page);
-            if (!res) { console.log('[WWAI http-phase1] pg', page, 'fetch failed'); break; }
+            if (!res) break;
 
             let json;
-            try { json = await res.json(); } catch (e) { console.log('[WWAI http-phase1] pg', page, 'JSON parse failed', e.message); break; }
+            try { json = await res.json(); } catch (e) { break; }
 
-            console.log('[WWAI http-phase1] pg', page, '| top-level keys:', Object.keys(json), '| data length:', json.data?.length ?? 'N/A');
             if (!json.data?.length) break;
 
             let addedThisPage = 0;
@@ -842,7 +841,6 @@ async function _runDirectScrapePhase1() {
                 const row = WWScaper.parseListingRow(apiRow);
                 if (row.jobId) { allRows.push(row); addedThisPage++; }
             }
-            console.log('[WWAI http-phase1] pg', page, 'added', addedThisPage, 'rows — total:', allRows.length);
             if (!addedThisPage) break;
 
             page++;
@@ -854,7 +852,7 @@ async function _runDirectScrapePhase1() {
         // Fall through to DOM Phase 1 if rows are already rendered (My Applications).
         // The 1200ms init timeout may have already fired with state=1 and skipped DOM Phase 1,
         // so we must retrigger it explicitly here.
-        if (!_directListingToken && document.querySelector('tr.table__row--body')) {
+        if (document.querySelector('tr.table__row--body')) {
             _directScrapeState = 1;
             _runDomPhase1();
         } else {
@@ -924,21 +922,16 @@ async function _runDomPhase1() {
     await new Promise(r => requestAnimationFrame(r));
 
     try {
-        const p1 = _collectPage();
-        console.log('[WWAI dom-phase1] page 1 collected:', p1, 'rows');
+        _collectPage();
 
         // Click through remaining pages. Each click updates rows in-place (Vuex, no XHR).
         const MAX_PAGES = 50;
         for (let pg = 2; pg <= MAX_PAGES; pg++) {
             const nextBtn = document.querySelector('a[aria-label="Go to next page"]');
-            if (!nextBtn) { console.log('[WWAI dom-phase1] no next button at pg', pg); break; }
+            if (!nextBtn) break;
             const li = nextBtn.closest('li');
             if (nextBtn.classList.contains('disabled') || li?.classList.contains('disabled') ||
                 nextBtn.getAttribute('aria-disabled') === 'true') {
-                console.log('[WWAI dom-phase1] next button disabled at pg', pg,
-                    '| btn.disabled:', nextBtn.classList.contains('disabled'),
-                    '| li.disabled:', !!li?.classList.contains('disabled'),
-                    '| aria-disabled:', nextBtn.getAttribute('aria-disabled'));
                 break;
             }
 
