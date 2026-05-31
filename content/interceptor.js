@@ -136,4 +136,25 @@
         if (typeof viewPosting === 'function')  { viewPosting(postingId);  return; }
         if (typeof loadPosting === 'function')  { loadPosting(postingId);  return; }
     });
+
+    // ── Pagination click relay ────────────────────────────────────────────────
+    // Isolated-world content scripts cannot click <a href="javascript:void(0);"> elements
+    // without triggering a CSP violation — Chrome evaluates the javascript: URL before
+    // Vue's event.preventDefault() fires.  Routing the click through the MAIN world
+    // avoids this because the page's own Vue handler intercepts it cleanly here.
+    //
+    // detail.selector — click the first element matching this CSS selector
+    // detail.action === 'first_page' — navigate to page 1 (tries aria-label then text "1")
+    document.addEventListener('__wwai_paginate', (e) => {
+        let btn = null;
+        if (e.detail?.action === 'first_page') {
+            btn = document.querySelector('a[aria-label="Go to first page"]')
+               ?? [...document.querySelectorAll('a.pagination__link')]
+                      .find(a => a.textContent.trim() === '1');
+        } else {
+            const sel = e.detail?.selector;
+            if (sel) btn = document.querySelector(sel);
+        }
+        if (btn) btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
 })();

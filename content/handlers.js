@@ -900,7 +900,11 @@ async function _runDomPhase1() {
 
         // Snapshot first row text to detect when DataViewer updates the table
         const snapBefore = document.querySelector('tr.table__row--body')?.textContent ?? '';
-        nextBtn.click();
+        // Route through MAIN world — clicking <a href="javascript:void(0);"> from an
+        // isolated-world script causes a CSP violation before Vue's handler fires.
+        document.dispatchEvent(new CustomEvent('__wwai_paginate', {
+            detail: { selector: 'a[aria-label="Go to next page"]' },
+        }));
 
         // Poll until row content changes (client-side update, typically < 200ms)
         let changed = false;
@@ -916,14 +920,8 @@ async function _runDomPhase1() {
         if (!added) break;
     }
 
-    // Return user to page 1 for clean UX
-    const firstPageBtn =
-        document.querySelector('a[aria-label="Go to first page"]') ??
-        [...document.querySelectorAll('a.pagination__link')]
-            .find(a => a.textContent.trim() === '1' &&
-                       !a.classList.contains('disabled') &&
-                       !a.closest('li')?.classList.contains('disabled'));
-    if (firstPageBtn) firstPageBtn.click();
+    // Return user to page 1 for clean UX — route through MAIN world to avoid CSP issues
+    document.dispatchEvent(new CustomEvent('__wwai_paginate', { detail: { action: 'first_page' } }));
 
     if (!allRows.length) {
         _directScrapeState = 0;
