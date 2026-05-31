@@ -1229,11 +1229,17 @@ function _showSearchOverlay(jobs, query, emptyMsg) {
         const tbody = document.createElement('tbody');
         tbody.addEventListener('click', (e) => {
             const row = e.target.closest('.wwai-overlay-row[data-job-id]');
-            if (row) _openJobFromOverlay(row.dataset.jobId);
+            if (!row) return;
+            tbody.querySelectorAll('.wwai-overlay-row--selected')
+                .forEach(r => r.classList.remove('wwai-overlay-row--selected'));
+            row.classList.add('wwai-overlay-row--selected');
+            _openJobFromOverlay(row.dataset.jobId);
         });
 
         for (const job of jobs) {
             const jobId = String(job.jobId ?? job.id ?? '');
+            // Search results only carry AI-scoring fields — fill gaps from the full jobs snapshot
+            const stored = _allJobsMap[jobId] ?? {};
             const tr = document.createElement('tr');
             tr.className = 'wwai-overlay-row';
             if (jobId) tr.dataset.jobId = jobId;
@@ -1241,26 +1247,27 @@ function _showSearchOverlay(jobs, query, emptyMsg) {
             const tdTitle = document.createElement('td');
             const titleBtn = document.createElement('span');
             titleBtn.className = 'wwai-overlay-title-btn';
-            titleBtn.textContent = job.title ?? '';
+            titleBtn.textContent = job.title ?? stored.title ?? '';
             tdTitle.appendChild(titleBtn);
 
             const tdEmp = document.createElement('td');
-            tdEmp.textContent = job.employer ?? job.organization ?? '';
+            tdEmp.textContent = job.employer ?? job.organization ?? stored.employer ?? stored.organization ?? '';
 
             const tdCity = document.createElement('td');
-            tdCity.textContent = job.city ?? '';
+            tdCity.textContent = job.city ?? stored.city ?? '';
 
             const tdTerm = document.createElement('td');
-            const rawDur = job.term ?? job.work_term_duration ?? '';
+            const rawDur = job.term ?? job.work_term_duration ?? stored.term ?? stored.work_term_duration ?? '';
             tdTerm.textContent = rawDur.replace(/\s*work\s*term\s*/i, '').trim();
 
             const tdDead = document.createElement('td');
-            const rawDeadline = job.deadline ?? job.app_deadline ?? '';
+            const rawDeadline = job.deadline ?? job.app_deadline ?? stored.deadline ?? stored.app_deadline ?? '';
             tdDead.textContent = rawDeadline ? _formatDate(rawDeadline) : '';
 
             const tdFit = document.createElement('td');
             const cached = _getCached(jobId, 'BATCH_FIT') ?? _getCached(jobId, 'BEST_FIT');
-            const score  = job.fitScore ?? job.fit_score ?? cached?.fitScore ?? cached?.fit_score ?? null;
+            const score  = job.fitScore ?? job.fit_score ?? cached?.fitScore ?? cached?.fit_score
+                        ?? _persistedFitScores[jobId] ?? null;
             if (score != null) {
                 const badge = document.createElement('span');
                 badge.className = `wwai-overlay-badge wwai-overlay-badge--${score >= 70 ? 'great' : score >= 40 ? 'decent' : 'poor'}`;
@@ -1288,10 +1295,10 @@ function _hideSearchOverlay() {
 
 function _openJobFromOverlay(jobId) {
     if (!jobId) return;
-    _clearTableFilter(); // close overlay first so the WW table and modal are visible
+    // Overlay stays open — WW modal z-index (100000102) is above the overlay (100000100),
+    // so the modal appears on top and the user returns to their results when they close it.
 
     // If the job row is on the current WW page, click its title link directly.
-    // This is the most reliable path — WW's own click handler opens the modal.
     const row = WWScaper.scrapeRowByJobId(jobId);
     if (row?.titleEl) {
         row.titleEl.click();
