@@ -907,25 +907,19 @@ async function _runDomPhase1() {
         return added;
     }
 
-    // Hide the DataViewer wrapper so page flips are invisible to the user.
-    // Find the common ancestor of the table and the pagination button — that's the
-    // DataViewer root regardless of WW's exact markup. visibility:hidden keeps the
-    // element in the DOM (so querySelectorAll and click() still work) but makes it
-    // invisible. Restored unconditionally in the finally block.
-    const _findHideTarget = () => {
-        const tableEl  = document.querySelector('tr.table__row--body')?.closest('table');
-        const paginBtn = document.querySelector('a[aria-label="Go to next page"]');
-        if (!tableEl) return null;
-        if (!paginBtn) return tableEl;
-        let el = tableEl.parentElement;
-        while (el && el !== document.body) {
-            if (el.contains(paginBtn)) return el;
-            el = el.parentElement;
-        }
-        return tableEl;
-    };
-    const hideEl = _findHideTarget();
-    if (hideEl) hideEl.style.visibility = 'hidden';
+    // Cover the viewport with an overlay that matches the page background so page
+    // flips are completely invisible. Double rAF guarantees the overlay has been
+    // committed to the screen before any pagination event is dispatched — without
+    // this the browser may batch the overlay paint with the first page flip and show
+    // both simultaneously.
+    const overlay = document.createElement('div');
+    const bg = getComputedStyle(document.body).backgroundColor;
+    // Fall back to white if background is transparent (inherit chain → no colour set)
+    const overlayBg = /rgba?\(\s*0,\s*0,\s*0,\s*0\)/.test(bg) ? '#fff' : bg;
+    overlay.style.cssText = `position:fixed;inset:0;z-index:2147483647;background:${overlayBg};pointer-events:none;`;
+    document.body.appendChild(overlay);
+    await new Promise(r => requestAnimationFrame(r));
+    await new Promise(r => requestAnimationFrame(r));
 
     try {
         _collectPage(); // page 1
@@ -962,12 +956,12 @@ async function _runDomPhase1() {
             if (!added) break;
         }
 
-        // Return to page 1 before restoring visibility so the user always sees page 1.
+        // Return to page 1, then wait for Vue to finish re-rendering before lifting the overlay.
         document.dispatchEvent(new CustomEvent('__wwai_paginate', { detail: { action: 'first_page' } }));
-        // Brief wait for Vue to finish re-rendering page 1 before we unhide.
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => requestAnimationFrame(r));
+        await new Promise(r => requestAnimationFrame(r));
     } finally {
-        if (hideEl) hideEl.style.visibility = '';
+        overlay.remove();
     }
 
     if (!allRows.length) {
