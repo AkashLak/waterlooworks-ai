@@ -775,6 +775,20 @@ async function _runDirectScrapePhase1() {
         for (const row of WWScaper.scrapeAllListingRows()) {
             if (row.jobId) domFallbackRows.push(row);
         }
+        // My Applications DataViewer paginates client-side — DOM fallback only captures the
+        // currently visible page.  If a next-page button exists, hand off to _runDomPhase1
+        // so it can click through every page and collect all rows.
+        if (domFallbackRows.length) {
+            const nextBtn = document.querySelector('a[aria-label="Go to next page"]');
+            const hasMorePages = nextBtn &&
+                !nextBtn.classList.contains('disabled') &&
+                !nextBtn.closest('li')?.classList.contains('disabled') &&
+                nextBtn.getAttribute('aria-disabled') !== 'true';
+            if (hasMorePages) {
+                _runDomPhase1();
+                return;
+            }
+        }
     }
 
     if (!_directListingToken && !_directListingUrl && !domFallbackRows.length) {
