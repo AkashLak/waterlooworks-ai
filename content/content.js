@@ -10,6 +10,7 @@
 let _currentJobId      = null;
 let _currentDetail     = null;
 let _currentAnalyses   = null; // pre-computed analyses from submitJob / polling
+let _submitting        = false; // true while _submitAndPoll is in flight (before _pollTimer is set)
 let _batchRunning      = false;
 let _lastSubmittedJobId = null; // dedup guard — prevents double-submit on modal class flicker
 let _activeFilter      = null; // Set of jobIds when table filter is active, null otherwise
@@ -227,6 +228,7 @@ new MutationObserver((mutations) => {
         _currentJobId    = null;
         _currentDetail   = null;
         _currentAnalyses = null;
+        _submitting      = false;
         _clearPolling();
         _onJobClose();
         _scheduleTableSync();

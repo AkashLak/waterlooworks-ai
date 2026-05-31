@@ -119,14 +119,26 @@ function _waitForModalContent(timeoutMs = 5000) {
  * @param {Object} detail - Output of WWScaper.scrapeJobDetail()
  */
 async function _submitAndPoll(detail) {
+    _submitting = true;
+    try {
+
     // Wait for WaterlooWorks to finish loading modal content before scraping.
     await _waitForModalContent();
 
     // Re-scrape now that content fields are populated. Bail if modal was closed.
     const modal = WWScaper.getActiveModal();
-    if (!modal) return;
+    if (!modal) { _submitting = false; return; }
     const fresh = WWScaper.scrapeJobDetail(modal) ?? detail;
-    if (fresh.jobId !== detail.jobId) return;
+    if (fresh.jobId !== detail.jobId) { _submitting = false; return; }
+
+    // Refresh meta line with post-load data — the initial scrape in _onJobOpen
+    // runs before modal content loads and can produce a wrong deadline value.
+    const metaEl = document.getElementById('wwai-job-meta');
+    if (metaEl && _currentJobId === fresh.jobId) {
+        const row = WWScaper.scrapeRowByJobId(fresh.jobId) ?? {};
+        const deadline = row.appDeadline || fresh.applicationDeadline || fresh.appDeadline || '';
+        metaEl.textContent = [fresh.employer || detail.employer, deadline ? `Deadline: ${deadline}` : ''].filter(Boolean).join(' · ');
+    }
 
     const row = WWScaper.scrapeRowByJobId(fresh.jobId) ?? {};
     // All Jobs modal uses different label text than My Applications:
@@ -154,8 +166,11 @@ async function _submitAndPoll(detail) {
     try {
         submitResult = await WWAnalyzer.submitJob(jobData);
     } catch (_) {
+        _submitting = false;
         return;
     }
+
+    _submitting = false;
 
     if (submitResult.analysesReady && submitResult.analyses) {
         _currentAnalyses = submitResult.analyses;
@@ -166,6 +181,8 @@ async function _submitAndPoll(detail) {
         _setLoading('Analyzing new job…');
         _startPolling(detail.jobId);
     }
+
+    } catch (_) { _submitting = false; } // outer try — catches _waitForModalContent errors
 }
 
 function _startPolling(jobId) {
@@ -430,7 +447,7 @@ async function _handlePrecomputed(mode) {
     const key = KEY_MAP[mode];
     const data = key && _currentAnalyses ? _currentAnalyses[key] : null;
     if (data) { _setCached(_currentJobId, mode, data); _renderResult(mode, data); }
-    else if (_pollTimer) _renderError({ message: 'Analysis in progress — please wait a moment and try again.' });
+    else if (_pollTimer || _submitting) _renderError({ message: 'Analysis in progress — please wait a moment and try again.' });
     else _renderError({ message: 'Analysis not yet available. Try reopening this job.' });
 }
 
