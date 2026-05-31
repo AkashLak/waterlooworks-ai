@@ -417,6 +417,11 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         _listingObserver.observe({ entryTypes: ['resource'] });
     }
 
+    // The PerformanceObserver disconnects once the first token is found, so page 2+
+    // navigation is never detected there.  The MAIN world interceptor fires
+    // __wwai_listing for every listing GET (including page nav) — listen here to catch them.
+    document.addEventListener('__wwai_listing', (e) => _onListingToken(e.detail.token, e.detail.url));
+
     // ── Token bootstrap — read DOM dataset written by the MAIN world interceptor ─
     const _root = document.documentElement;
 

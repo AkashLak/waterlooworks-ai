@@ -800,7 +800,8 @@ async function _runDirectScrapePhase1() {
             });
         }
         const url = new URL(_directListingUrl);
-        url.searchParams.set('itemsPerPage', '100');
+        // Do NOT override itemsPerPage — WW calculates page offset as (page-1)*itemsPerPage.
+        // Applications caps at 45/page; requesting 100 makes page 2 start at record 101 (empty).
         url.searchParams.set('page', String(pageNum));
         return _directFetch(url.toString());
     }
@@ -1123,7 +1124,6 @@ async function _runPeriodicNewJobCheck() {
             });
         }
         const url = new URL(_directListingUrl);
-        url.searchParams.set('itemsPerPage', '100');
         url.searchParams.set('page', String(pageNum));
         return _directFetch(url.toString());
     }
