@@ -146,7 +146,6 @@
     // detail.selector — click the first element matching this CSS selector
     // detail.action === 'first_page' — navigate to page 1 (tries aria-label then text "1")
     document.addEventListener('__wwai_paginate', (e) => {
-        console.log('[WWAI interceptor] __wwai_paginate received', e.detail);
         let btn = null;
         if (e.detail?.action === 'first_page') {
             btn = document.querySelector('a[aria-label="Go to first page"]')
@@ -156,11 +155,6 @@
             const sel = e.detail?.selector;
             if (sel) btn = document.querySelector(sel);
         }
-        if (btn) {
-            console.log('[WWAI interceptor] clicking button:', btn.getAttribute('aria-label') ?? btn.textContent.trim().slice(0, 30));
-            btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-        } else {
-            console.log('[WWAI interceptor] button NOT FOUND for detail:', JSON.stringify(e.detail));
-        }
+        if (btn) btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     });
 })();

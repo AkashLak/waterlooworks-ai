@@ -907,50 +907,68 @@ async function _runDomPhase1() {
         return added;
     }
 
-    const p1count = _collectPage();
-    console.log('[WWAI dom-phase1] page 1 collected:', p1count, 'rows');
+    // Hide the DataViewer wrapper so page flips are invisible to the user.
+    // Find the common ancestor of the table and the pagination button — that's the
+    // DataViewer root regardless of WW's exact markup. visibility:hidden keeps the
+    // element in the DOM (so querySelectorAll and click() still work) but makes it
+    // invisible. Restored unconditionally in the finally block.
+    const _findHideTarget = () => {
+        const tableEl  = document.querySelector('tr.table__row--body')?.closest('table');
+        const paginBtn = document.querySelector('a[aria-label="Go to next page"]');
+        if (!tableEl) return null;
+        if (!paginBtn) return tableEl;
+        let el = tableEl.parentElement;
+        while (el && el !== document.body) {
+            if (el.contains(paginBtn)) return el;
+            el = el.parentElement;
+        }
+        return tableEl;
+    };
+    const hideEl = _findHideTarget();
+    if (hideEl) hideEl.style.visibility = 'hidden';
 
-    // Click through remaining pages. Each click updates rows in-place (Vuex, no XHR).
-    const MAX_PAGES = 50;
-    for (let pg = 2; pg <= MAX_PAGES; pg++) {
-        const nextBtn = document.querySelector('a[aria-label="Go to next page"]');
-        if (!nextBtn) { console.log('[WWAI dom-phase1] no next button at pg', pg); break; }
-        const li = nextBtn.closest('li');
-        if (nextBtn.classList.contains('disabled') || li?.classList.contains('disabled') ||
-            nextBtn.getAttribute('aria-disabled') === 'true') {
-            console.log('[WWAI dom-phase1] next button disabled at pg', pg);
-            break;
+    try {
+        _collectPage(); // page 1
+
+        // Click through remaining pages. Each click updates rows in-place (Vuex, no XHR).
+        const MAX_PAGES = 50;
+        for (let pg = 2; pg <= MAX_PAGES; pg++) {
+            const nextBtn = document.querySelector('a[aria-label="Go to next page"]');
+            if (!nextBtn) break;
+            const li = nextBtn.closest('li');
+            if (nextBtn.classList.contains('disabled') || li?.classList.contains('disabled') ||
+                nextBtn.getAttribute('aria-disabled') === 'true') break;
+
+            const idBefore = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
+            // Route through MAIN world — clicking <a href="javascript:void(0);"> from an
+            // isolated-world script causes a CSP violation before Vue's handler fires.
+            document.dispatchEvent(new CustomEvent('__wwai_paginate', {
+                detail: { selector: 'a[aria-label="Go to next page"]' },
+            }));
+
+            // Poll until the first visible row's job ID changes (Vue re-renders in-place).
+            // Comparing job IDs rather than textContent so concurrent badge injections
+            // don't produce a false positive while we're still on the same page.
+            let flipped = false;
+            const deadline = Date.now() + 3000;
+            while (Date.now() < deadline) {
+                await new Promise(r => setTimeout(r, 150));
+                const idNow = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
+                if (idNow && idNow !== idBefore) { flipped = true; break; }
+            }
+            if (!flipped) break;
+
+            const added = _collectPage();
+            if (!added) break;
         }
 
-        const idBefore = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
-        console.log('[WWAI dom-phase1] navigating to pg', pg, '| first-row id before:', idBefore);
-        // Route through MAIN world — clicking <a href="javascript:void(0);"> from an
-        // isolated-world script causes a CSP violation before Vue's handler fires.
-        document.dispatchEvent(new CustomEvent('__wwai_paginate', {
-            detail: { selector: 'a[aria-label="Go to next page"]' },
-        }));
-
-        // Poll until the first visible row's job ID changes.
-        // Using job ID (not textContent) so concurrent badge injections don't
-        // cause a false positive while we're still on the same page.
-        let flipped = false;
-        const deadline = Date.now() + 3000;
-        while (Date.now() < deadline) {
-            await new Promise(r => setTimeout(r, 150));
-            const idNow = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
-            if (idNow && idNow !== idBefore) { flipped = true; break; }
-        }
-        console.log('[WWAI dom-phase1] pg', pg, 'flip:', flipped,
-                    '| first-row id now:', WWScaper.scrapeAllListingRows()[0]?.jobId ?? '(none)');
-        if (!flipped) break;
-
-        const added = _collectPage();
-        console.log('[WWAI dom-phase1] pg', pg, 'added', added, 'new rows — total:', allRows.length);
-        if (!added) break;
+        // Return to page 1 before restoring visibility so the user always sees page 1.
+        document.dispatchEvent(new CustomEvent('__wwai_paginate', { detail: { action: 'first_page' } }));
+        // Brief wait for Vue to finish re-rendering page 1 before we unhide.
+        await new Promise(r => setTimeout(r, 200));
+    } finally {
+        if (hideEl) hideEl.style.visibility = '';
     }
-
-    // Return user to page 1 for clean UX — route through MAIN world to avoid CSP issues
-    document.dispatchEvent(new CustomEvent('__wwai_paginate', { detail: { action: 'first_page' } }));
 
     if (!allRows.length) {
         _directScrapeState = 0;
