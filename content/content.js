@@ -32,6 +32,7 @@ let _directHtmlDetailToken = null; // the specific POST token that returns job H
 let _directGeoToken        = null; // the POST token that returns geo JSON (city, country) — cached after Phase 2
 let _directDetailBase      = null; // resolved absolute URL for detail POSTs (cached after Phase 2)
 let _lastSyncedAt          = null; // ms timestamp of last successful row sync (from server response)
+let _persistedFitScores    = {};   // jobId → fitScore number, loaded from chrome.storage.local at init
 let _lastKnownTotal        = 0;    // totalResults from the last listing fetch — used to detect new postings
 let _periodicCheckTimer    = null; // setInterval handle for the background new-job check
 
@@ -321,6 +322,13 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         el.className = 'wwai-resume-status ' + (hasResume ? 'wwai-resume-status--ok' : 'wwai-resume-status--warn');
     }
     WWStorage.getResume().then(r => _updateResumeStatus(!!r));
+
+    // Load persisted fit scores so badges survive tab close/reopen
+    WWStorage.getFitScores().then(scores => {
+        _persistedFitScores = scores ?? {};
+        _scheduleTableSync(); // re-inject badges now that scores are available
+    });
+
     chrome.storage.onChanged.addListener((changes, area) => {
         if (area !== 'local') return;
         if ('ww_resume' in changes) {
@@ -328,6 +336,8 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
             Object.keys(sessionStorage)
                 .filter(k => k.startsWith('wwai_') && (k.endsWith('_BEST_FIT') || k.endsWith('_DREAM_JOB') || k.endsWith('_BATCH_FIT')))
                 .forEach(k => sessionStorage.removeItem(k));
+            WWStorage.clearFitScores();
+            _persistedFitScores = {};
             _clearResult();
         }
         if ('ww_dream_criteria' in changes) {

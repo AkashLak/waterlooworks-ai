@@ -240,11 +240,11 @@ function _injectBadge(row, score) {
 function _injectPrecomputedBadges(rows, jobsMap) {
     for (const row of rows) {
         const job = jobsMap[row.jobId];
-        // Only show badges from Score All Jobs (BATCH_FIT) — individual Analyze Fit clicks don't populate badges
         const batchFit = _getCached(row.jobId, 'BATCH_FIT');
         const score = batchFit?.fitScore ?? batchFit?.fit_score
+                   ?? _persistedFitScores[row.jobId]
                    ?? (job ? (job.fitScore ?? job.fit_score ?? null) : null);
-        if (score == null) continue; // no score yet — don't show ❓ passively
+        if (score == null) continue;
         _injectBadge(row, score);
     }
 }

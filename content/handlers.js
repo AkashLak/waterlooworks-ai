@@ -53,6 +53,17 @@ async function _fetchHtmlText(res) {
     return new TextDecoder('windows-1252').decode(bytes);
 }
 
+// Writes a fit score to session cache (BATCH_FIT) and persists the numeric score
+// to chrome.storage.local so badges survive tab close / session end.
+function _persistFitScore(jobId, fit) {
+    _setCached(jobId, 'BATCH_FIT', fit);
+    const score = fit?.fitScore ?? fit?.fit_score ?? null;
+    if (score != null) {
+        _persistedFitScores[String(jobId)] = score;
+        WWStorage.setFitScore(String(jobId), score).catch(() => {});
+    }
+}
+
 // ── Job submission and analysis polling ────────────────────────────────────────
 
 /**
@@ -297,7 +308,7 @@ async function _prefetchFitScore() {
     try {
         const fit = await WWAnalyzer.getFitScore(jobId);
         _setCached(jobId, 'BEST_FIT', fit);
-        _setCached(jobId, 'BATCH_FIT', fit);
+        _persistFitScore(jobId, fit);
         // Inject badge even if modal closed — table row is always in the DOM
         const tableRow = WWScaper.scrapeRowByJobId(jobId);
         if (tableRow) _injectBadge(tableRow, fit.fitScore ?? fit.fit_score);
@@ -471,7 +482,7 @@ async function _handleShouldIApply() {
 
         // Ensure badge is in the table (prefetch may have already done this, but guard for direct clicks)
         if (!_getCached(_currentJobId, 'BATCH_FIT')) {
-            _setCached(_currentJobId, 'BATCH_FIT', fit);
+            _persistFitScore(_currentJobId, fit);
             const tableRow = WWScaper.scrapeRowByJobId(_currentJobId);
             if (tableRow) _injectBadge(tableRow, fit.fitScore ?? fit.fit_score);
         }
@@ -621,7 +632,7 @@ async function _handleBatch() {
 
         const fitScore = jobRec.fitScore ?? jobRec.fit_score ?? null;
         if (fitScore != null) {
-            _setCached(row.jobId, 'BATCH_FIT', { fitScore });
+            _persistFitScore(row.jobId, { fitScore });
             _injectBadge(row, fitScore);
             _tallyStat(stats, fitScore);
             scoredCount++;
@@ -630,7 +641,7 @@ async function _handleBatch() {
             const sessionCached = _getCached(row.jobId, 'BEST_FIT');
             if (sessionCached) {
                 const cachedScore = sessionCached.fitScore ?? sessionCached.fit_score;
-                _setCached(row.jobId, 'BATCH_FIT', sessionCached);
+                _persistFitScore(row.jobId, sessionCached);
                 _injectBadge(row, cachedScore);
                 _tallyStat(stats, cachedScore);
                 scoredCount++;
@@ -640,7 +651,7 @@ async function _handleBatch() {
                     const fit = await WWAnalyzer.getFitScore(row.jobId);
                     const score = fit.fitScore ?? fit.fit_score;
                     _setCached(row.jobId, 'BEST_FIT', fit);
-                    _setCached(row.jobId, 'BATCH_FIT', fit);
+                    _persistFitScore(row.jobId, fit);
                     _injectBadge(row, score);
                     _tallyStat(stats, score);
                     scoredCount++;
@@ -672,7 +683,7 @@ async function _handleBatch() {
             try {
                 const fit = await WWAnalyzer.getFitScore(id);
                 _setCached(id, 'BEST_FIT', fit);
-                _setCached(id, 'BATCH_FIT', fit);
+                _persistFitScore(id, fit);
             } catch (_) {}
         }
     }
