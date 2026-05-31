@@ -829,11 +829,12 @@ async function _runDirectScrapePhase1() {
         // (e.g. My Applications sets totalResults to the per-page count, not the grand total).
         while (page <= MAX_PAGES) {
             const res = await _fetchListingPage(page);
-            if (!res) break;
+            if (!res) { console.log('[WWAI http-phase1] pg', page, 'fetch failed'); break; }
 
             let json;
-            try { json = await res.json(); } catch { break; }
+            try { json = await res.json(); } catch (e) { console.log('[WWAI http-phase1] pg', page, 'JSON parse failed', e.message); break; }
 
+            console.log('[WWAI http-phase1] pg', page, '| top-level keys:', Object.keys(json), '| data length:', json.data?.length ?? 'N/A');
             if (!json.data?.length) break;
 
             let addedThisPage = 0;
@@ -841,6 +842,7 @@ async function _runDirectScrapePhase1() {
                 const row = WWScaper.parseListingRow(apiRow);
                 if (row.jobId) { allRows.push(row); addedThisPage++; }
             }
+            console.log('[WWAI http-phase1] pg', page, 'added', addedThisPage, 'rows — total:', allRows.length);
             if (!addedThisPage) break;
 
             page++;
