@@ -384,9 +384,14 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         _directListingToken = token;
         _directListingUrl   = url;
         // State 0: normal first-time run.
-        // State 2: DOM Phase 1 ran first (before token arrived) and scraped only visible rows.
-        //          HTTP Phase 1 can paginate — restart it now that we have the token.
-        if (_directScrapeState === 0 || _directScrapeState === 2) {
+        // State 2 + no rows: DOM Phase 1 ran first but only captured the visible page.
+        //   HTTP Phase 1 can now paginate via the token — restart it.
+        // State 2 + rows present: DOM Phase 1 already collected all pages.
+        //   Do NOT restart — WW sometimes fires a listing GET with a token after DOM Phase 1
+        //   has already finished (e.g. My Applications internal navigation).  Restarting here
+        //   would call _runDomPhase1 again from the user's current page and overwrite
+        //   _directScrapeRows with only a partial set.
+        if (_directScrapeState === 0 || (_directScrapeState === 2 && !_directScrapeRows?.length)) {
             _directScrapeState = 1;
             _runDirectScrapePhase1();
         }

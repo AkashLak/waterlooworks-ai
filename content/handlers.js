@@ -827,15 +827,13 @@ async function _runDirectScrapePhase1() {
         // Page-exhaustion loop: fetch until WW returns an empty page.
         // totalResults is not used for stopping — WW listing types return it inconsistently
         // (e.g. My Applications sets totalResults to the per-page count, not the grand total).
-        console.log('[WWAI http-phase1] starting — token:', _directListingToken?.slice(0,20), 'url:', _directListingUrl, 'method:', _directListingMethod);
         while (page <= MAX_PAGES) {
             const res = await _fetchListingPage(page);
-            if (!res) { console.log('[WWAI http-phase1] pg', page, 'no response'); break; }
+            if (!res) break;
 
             let json;
-            try { json = await res.json(); } catch (e) { console.log('[WWAI http-phase1] pg', page, 'JSON parse failed:', e.message); break; }
+            try { json = await res.json(); } catch (e) { break; }
 
-            console.log('[WWAI http-phase1] pg', page, 'keys:', Object.keys(json), 'data.length:', json.data?.length ?? 'N/A');
             if (!json.data?.length) break;
 
             let addedThisPage = 0;
@@ -843,17 +841,14 @@ async function _runDirectScrapePhase1() {
                 const row = WWScaper.parseListingRow(apiRow);
                 if (row.jobId) { allRows.push(row); addedThisPage++; }
             }
-            console.log('[WWAI http-phase1] pg', page, 'added', addedThisPage, 'total:', allRows.length);
             if (!addedThisPage) break;
 
             page++;
         }
     }
 
-    console.log('[WWAI phase1] allRows.length:', allRows.length, 'domFallback:', domFallbackRows.length);
     if (!allRows.length) {
         const hasRows = !!document.querySelector('tr.table__row--body');
-        console.log('[WWAI phase1] fallback — hasRows:', hasRows, 'token:', _directListingToken?.slice(0,20));
         if (hasRows) {
             _directScrapeState = 1;
             _runDomPhase1();
@@ -924,19 +919,13 @@ async function _runDomPhase1() {
     await new Promise(r => requestAnimationFrame(r));
 
     try {
-        const p1 = _collectPage();
-        console.log('[WWAI dom-phase1] page 1 collected:', p1, 'rows');
+        _collectPage();
 
         // Click through remaining pages. Each click updates rows in-place (Vuex, no XHR).
         const MAX_PAGES = 50;
         for (let pg = 2; pg <= MAX_PAGES; pg++) {
             const nextBtn = document.querySelector('a[aria-label="Go to next page"]');
             const li = nextBtn?.closest('li');
-            console.log('[WWAI dom-phase1] pg', pg,
-                'nextBtn:', nextBtn ? 'found' : 'NOT FOUND',
-                '| btn.disabled:', nextBtn?.classList.contains('disabled'),
-                '| li.disabled:', !!li?.classList.contains('disabled'),
-                '| aria-disabled:', nextBtn?.getAttribute('aria-disabled'));
             if (!nextBtn) break;
             if (nextBtn.classList.contains('disabled') || li?.classList.contains('disabled') ||
                 nextBtn.getAttribute('aria-disabled') === 'true') {
@@ -944,7 +933,6 @@ async function _runDomPhase1() {
             }
 
             const idBefore = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
-            console.log('[WWAI dom-phase1] pg', pg, 'idBefore:', idBefore, '— dispatching paginate');
             // Route through MAIN world — clicking <a href="javascript:void(0);"> from an
             // isolated-world script causes a CSP violation before Vue's handler fires.
             document.dispatchEvent(new CustomEvent('__wwai_paginate', {
@@ -961,11 +949,9 @@ async function _runDomPhase1() {
                 const idNow = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
                 if (idNow && idNow !== idBefore) { flipped = true; break; }
             }
-            console.log('[WWAI dom-phase1] pg', pg, 'flipped:', flipped);
             if (!flipped) break;
 
             const added = _collectPage();
-            console.log('[WWAI dom-phase1] pg', pg, 'added:', added, 'total:', allRows.length);
             if (!added) break;
         }
 
@@ -1005,7 +991,6 @@ async function _runDomPhase1() {
 
 async function _runDirectScrapePhase2() {
     const rows = _directScrapeRows;
-    console.log('[WWAI phase2] start — rows:', rows?.length, 'tokens:', _directDetailTokens.length, 'state:', _directScrapeState);
     if (!rows?.length) {
         // Rows not populated yet — fall back to waiting for first click.
         _directScrapeState = 2;
@@ -1034,7 +1019,6 @@ async function _runDirectScrapePhase2() {
     } catch (_) {}
 
     const rowsToFetch = rows.filter(r => !describedIds.has(String(r.jobId)));
-    console.log('[WWAI phase2] describedIds:', describedIds.size, 'rowsToFetch:', rowsToFetch.length, 'sampleId:', rowsToFetch[0]?.jobId);
 
     if (!rowsToFetch.length) {
         _directScrapeState = 4;
@@ -1045,7 +1029,6 @@ async function _runDirectScrapePhase2() {
 
     // Find which captured token returns job detail HTML (not the JSON geo-data token)
     const htmlToken = await _findHtmlDetailToken(rowsToFetch[0]);
-    console.log('[WWAI phase2] htmlToken:', htmlToken?.slice(0, 20), 'detailUrl:', _directDetailUrl, 'detailTokens:', _directDetailTokens.length);
     if (!htmlToken) {
         // No detail token available yet — fall back to waiting for the user to click any job.
         // _onDetailToken will restart Phase 2 once a token is captured.
@@ -1093,16 +1076,14 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body,
                     });
-                    if (!res) { if (i === 0) console.log('[WWAI fetchDesc] no res for', row.jobId); return; }
+                    if (!res) return;
 
                     const html = await _fetchHtmlText(res);
-                    if (i === 0) console.log('[WWAI fetchDesc] jobId:', row.jobId, 'hasKV:', html.includes('tag__key-value-list'), 'htmlLen:', html.length);
                     if (!html.includes('tag__key-value-list')) return;
 
                     const detail = WWScaper.scrapeJobDetailFromHtml(
                         html, row.jobId, row.title, row.organization || row.employer || '', row.division
                     );
-                    if (i === 0) console.log('[WWAI fetchDesc] detail:', detail ? 'ok' : 'null', 'summary:', detail?.jobSummary?.slice(0,50));
                     if (!detail) return;
 
                     const desc = WWScaper.extractJobDescription(detail);
@@ -1133,13 +1114,12 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
                         externalUrl:                 _decodeHtml(detail.ifByWebsiteGoTo || detail.ifByEmailSendTo || _extractExternalAppUrl(detail.additionalApplicationInformation || '') || ''),
                     });
                     fetched++;
-                } catch (err) { if (i === 0) console.log('[WWAI fetchDesc] caught:', err?.message); }
+                } catch (_) {}
             })
         );
         _updateStatusLine(`${statusLabel}… ${fetched}/${total} fetched`);
     }
 
-    console.log('[WWAI fetchDesc] done — jobDatas.length:', jobDatas.length, 'fetched:', fetched, 'total:', total);
     if (!jobDatas.length) {
         _updateStatusLine('No descriptions fetched');
         return;
@@ -1174,9 +1154,8 @@ async function _findHtmlDetailToken(sampleRow) {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body,
         });
-        if (!res) { console.log('[WWAI findHtmlToken] no response for token', token?.slice(0,20)); continue; }
+        if (!res) continue;
         const text = await res.text();
-        console.log('[WWAI findHtmlToken] token', token?.slice(0,20), '| hasKVList:', text.includes('tag__key-value-list'), '| first200:', text.slice(0,200));
         if (text.includes('tag__key-value-list')) {
             htmlToken = token;
         } else {
