@@ -1426,7 +1426,9 @@ async function _openJobFromOverlay(jobId) {
 
     // If the job row is on the current WW page, click its title link directly.
     const row = WWScaper.scrapeRowByJobId(jobId);
+    console.log('[WWAI overlay] opening job', jobId, 'row found:', !!row, 'titleEl:', !!row?.titleEl, '_jobPageMap size:', _jobPageMap.size, 'targetPage:', _jobPageMap.get(String(jobId)));
     if (row?.titleEl) {
+        console.log('[WWAI overlay] clicking titleEl for job', jobId);
         row.titleEl.click();
         return;
     }
@@ -1435,13 +1437,16 @@ async function _openJobFromOverlay(jobId) {
     // Navigate to the page we collected it from, then click the row.
     const targetPage = _jobPageMap.get(String(jobId));
     if (targetPage) {
+        console.log('[WWAI overlay] navigating to page', targetPage, 'for job', jobId);
         await _navigateToDomPage(targetPage);
         const r = WWScaper.scrapeRowByJobId(jobId);
+        console.log('[WWAI overlay] after nav, row found:', !!r, 'titleEl:', !!r?.titleEl);
         if (r?.titleEl) { r.titleEl.click(); return; }
     }
 
     // Fallback: dispatch to MAIN world so interceptor.js can call WW's viewPosting().
     // Works on Full Cycle jobs board; may be a no-op on My Applications.
+    console.log('[WWAI overlay] fallback __wwai_open_job for', jobId);
     document.dispatchEvent(new CustomEvent('__wwai_open_job', { detail: { postingId: jobId } }));
 }
 
