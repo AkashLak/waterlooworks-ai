@@ -1430,7 +1430,13 @@ async function _openJobFromOverlay(jobId) {
     console.log('[WWAI overlay] opening job', jobId, 'row found:', !!row, 'titleEl:', !!row?.titleEl, '_jobPageMap size:', _jobPageMap.size, 'targetPage:', _jobPageMap.get(String(jobId)));
     console.log('[WWAI overlay] DOM rows on current page:', domRows.length, '| first 5 ids:', domRows.slice(0,5).map(r=>r.jobId));
     const firstTr = document.querySelector('tr.table__row--body');
-    if (firstTr) console.log('[WWAI overlay] first row outerHTML:', firstTr.outerHTML.slice(0, 600));
+    if (firstTr) {
+        console.log('[WWAI overlay] first row outerHTML (0-800):', firstTr.outerHTML.slice(0, 800));
+        console.log('[WWAI overlay] first row outerHTML (800-1600):', firstTr.outerHTML.slice(800, 1600));
+        console.log('[WWAI overlay] first row all tds text:', Array.from(firstTr.querySelectorAll('td.table__value')).map(td => td.textContent.trim().slice(0,40)));
+        console.log('[WWAI overlay] first row th text:', firstTr.querySelector('th')?.textContent?.trim().slice(0,100));
+        console.log('[WWAI overlay] first row all links/buttons:', [...firstTr.querySelectorAll('a,button')].map(el => `${el.tagName}[${el.className.slice(0,30)}] aria="${el.getAttribute('aria-label')}" href="${el.getAttribute('href')}"`));
+    }
     if (row?.titleEl) {
         console.log('[WWAI overlay] clicking titleEl for job', jobId);
         row.titleEl.click();
