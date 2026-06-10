@@ -1426,19 +1426,7 @@ async function _openJobFromOverlay(jobId) {
 
     // If the job row is on the current WW page, click its title link directly.
     const row = WWScaper.scrapeRowByJobId(jobId);
-    const domRows = WWScaper.scrapeAllListingRows();
-    console.log('[WWAI overlay] opening job', jobId, 'row found:', !!row, 'titleEl:', !!row?.titleEl, '_jobPageMap size:', _jobPageMap.size, 'targetPage:', _jobPageMap.get(String(jobId)));
-    console.log('[WWAI overlay] DOM rows on current page:', domRows.length, '| first 5 ids:', domRows.slice(0,5).map(r=>r.jobId));
-    const firstTr = document.querySelector('tr.table__row--body');
-    if (firstTr) {
-        console.log('[WWAI overlay] first row outerHTML (0-800):', firstTr.outerHTML.slice(0, 800));
-        console.log('[WWAI overlay] first row outerHTML (800-1600):', firstTr.outerHTML.slice(800, 1600));
-        console.log('[WWAI overlay] first row all tds text:', Array.from(firstTr.querySelectorAll('td.table__value')).map(td => td.textContent.trim().slice(0,40)));
-        console.log('[WWAI overlay] first row th text:', firstTr.querySelector('th')?.textContent?.trim().slice(0,100));
-        console.log('[WWAI overlay] first row all links/buttons:', [...firstTr.querySelectorAll('a,button')].map(el => `${el.tagName}[${el.className.slice(0,30)}] aria="${el.getAttribute('aria-label')}" href="${el.getAttribute('href')}"`));
-    }
     if (row?.titleEl) {
-        console.log('[WWAI overlay] clicking titleEl for job', jobId);
         row.titleEl.click();
         return;
     }
@@ -1447,18 +1435,13 @@ async function _openJobFromOverlay(jobId) {
     // Navigate to the page we collected it from, then click the row.
     const targetPage = _jobPageMap.get(String(jobId));
     if (targetPage) {
-        console.log('[WWAI overlay] navigating to page', targetPage, 'for job', jobId);
         await _navigateToDomPage(targetPage);
         const r = WWScaper.scrapeRowByJobId(jobId);
-        const domRows2 = WWScaper.scrapeAllListingRows();
-        console.log('[WWAI overlay] after nav, row found:', !!r, 'titleEl:', !!r?.titleEl);
-        console.log('[WWAI overlay] DOM rows after nav:', domRows2.length, '| first 5 ids:', domRows2.slice(0,5).map(r=>r.jobId));
         if (r?.titleEl) { r.titleEl.click(); return; }
     }
 
     // Fallback: dispatch to MAIN world so interceptor.js can call WW's viewPosting().
     // Works on Full Cycle jobs board; may be a no-op on My Applications.
-    console.log('[WWAI overlay] fallback __wwai_open_job for', jobId);
     document.dispatchEvent(new CustomEvent('__wwai_open_job', { detail: { postingId: jobId } }));
 }
 
