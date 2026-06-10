@@ -527,6 +527,9 @@ const SEARCH_EMPTY_MESSAGES = {
 };
 
 async function _handleFreeSearch(query) {
+    if (/\b(highest.pay|top.pay|best.pay|highest.salary|top.salary|most.paid|highest.paid|highest.compensation|top.compensation|highest.wage|best.wage|highest.earning)\b/i.test(query)) {
+        return _handleSearch('top_compensation');
+    }
     _clearTableFilter();
     _setLoading(`Searching "${query}"…`); _clearResult();
     try {
@@ -537,8 +540,8 @@ async function _handleFreeSearch(query) {
         if (!jobs.length) {
             if (_directScrapeState < 4 && /\b(month|hybrid|remote|in.person|on.?site|arrangement|skill|education|duration|gpa)\b/i.test(query)) {
                 emptyMsg = 'Work term duration, hybrid/remote, and skills details aren\'t loaded yet — click any job title once, then search again.';
-            } else if (/\b(pay|paid|salary|salaries|compensation|compens|wage|wages|highest.pay|top.pay|best.pay|earn|earning|hourly|stipend)\b/i.test(query)) {
-                emptyMsg = 'Looks like a pay question — try the "💰 Top Pay" button below to rank jobs by compensation.';
+            } else if (/\b(pay|paid|salary|salaries|compensation|compens|wage|wages|earn|earning|hourly|stipend)\b/i.test(query)) {
+                emptyMsg = 'Looks like a pay question — try searching "highest paying jobs" or "top salary" to rank jobs by compensation.';
             } else if (/\b(best|good for me|suit me|match|recommend|should i|qualify|top fits?|fit for)\b/i.test(query)) {
                 emptyMsg = 'Looks like a fit question — try the "🎯 Top 10 Fits for Me" button below, which uses your resume to find your best matches.';
             } else {
