@@ -7,6 +7,7 @@ const MAX_POLLS        = 30;
 let _pollTimer  = null;
 let _pollCount  = 0;
 let _overlayEl  = null; // injected overlay for cross-page search results
+let _jobPageMap = new Map(); // jobId → 1-based page number (populated by _runDomPhase1)
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -532,10 +533,13 @@ async function _handleFreeSearch(query) {
         const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
 
         let emptyMsg = null;
-        if (!jobs.length && _directScrapeState < 4) {
-            const asksForModalFields = /\b(month|hybrid|remote|in.person|on.?site|arrangement|skill|education|duration|gpa)\b/i.test(query);
-            if (asksForModalFields) {
+        if (!jobs.length) {
+            if (_directScrapeState < 4 && /\b(month|hybrid|remote|in.person|on.?site|arrangement|skill|education|duration|gpa)\b/i.test(query)) {
                 emptyMsg = 'Work term duration, hybrid/remote, and skills details aren\'t loaded yet — click any job title once, then search again.';
+            } else if (/\b(best|good for me|suit me|match|recommend|should i|qualify|top fits?|fit for)\b/i.test(query)) {
+                emptyMsg = 'Looks like a fit question — try the "🎯 Top 10 Fits for Me" button below, which uses your resume to find your best matches.';
+            } else {
+                emptyMsg = `No matching jobs found for "${query}" — try different keywords or a broader phrase.`;
             }
         }
 
@@ -563,7 +567,10 @@ async function _handleSearch(searchType) {
 
         const label    = SEARCH_LABELS[searchType] ?? searchType;
         const emptyMsg = SEARCH_EMPTY_MESSAGES[searchType] ?? null;
-        _showSearchOverlay(jobs, label, emptyMsg);
+        const titleOverride = (searchType === 'top_fits' && jobs.length > 0 && jobs.length < 10)
+            ? `${jobs.length} scored fits (only ${jobs.length} jobs scored — run Score All Jobs to rank more)`
+            : null;
+        _showSearchOverlay(jobs, label, emptyMsg, titleOverride);
         _renderFilterCard(jobs.length, jobs.length, label, emptyMsg);
     } catch (err) {
         _renderError(err);
@@ -891,12 +898,15 @@ async function _runDomPhase1() {
 
     const seenIds = new Set();
     const allRows = [];
+    _jobPageMap = new Map();
+    let _currentPage = 1;
 
     function _collectPage() {
         let added = 0;
         for (const row of WWScaper.scrapeAllListingRows()) {
             if (row.jobId && !seenIds.has(row.jobId)) {
                 seenIds.add(row.jobId);
+                _jobPageMap.set(String(row.jobId), _currentPage);
                 allRows.push(row);
                 added++;
             }
@@ -951,6 +961,7 @@ async function _runDomPhase1() {
             }
             if (!flipped) break;
 
+            _currentPage = pg;
             const added = _collectPage();
             if (!added) break;
         }
@@ -1293,7 +1304,7 @@ function _tallyStat(stats, score) {
 //   • job is on another page → dispatch __wwai_open_job to the MAIN world,
 //     which calls WW's viewPosting() to load the modal without page navigation
 
-function _showSearchOverlay(jobs, query, emptyMsg) {
+function _showSearchOverlay(jobs, query, emptyMsg, titleOverride = null) {
     _hideSearchOverlay();
     _filterMeta = { shown: jobs.length, total: jobs.length, query, emptyMsg: emptyMsg ?? null };
 
@@ -1306,9 +1317,9 @@ function _showSearchOverlay(jobs, query, emptyMsg) {
 
     const barTitle = document.createElement('span');
     barTitle.className = 'wwai-overlay-bar__title';
-    barTitle.textContent = jobs.length
+    barTitle.textContent = titleOverride ?? (jobs.length
         ? `${jobs.length} result${jobs.length !== 1 ? 's' : ''} for "${query}"`
-        : `No results for "${query}"`;
+        : `No results for "${query}"`);
 
     const clearBtn = document.createElement('button');
     clearBtn.className = 'wwai-overlay-bar__clear';
@@ -1408,7 +1419,7 @@ function _hideSearchOverlay() {
     if (_overlayEl) { _overlayEl.remove(); _overlayEl = null; }
 }
 
-function _openJobFromOverlay(jobId) {
+async function _openJobFromOverlay(jobId) {
     if (!jobId) return;
     // Overlay stays open — WW modal z-index (100000102) is above the overlay (100000100),
     // so the modal appears on top and the user returns to their results when they close it.
@@ -1420,9 +1431,42 @@ function _openJobFromOverlay(jobId) {
         return;
     }
 
-    // Job is on a different page — dispatch to MAIN world so interceptor.js can call
-    // WW's native viewPosting(), which loads the modal without page navigation.
+    // Job is on a different page (DOM-paginated board like My Applications or ESD).
+    // Navigate to the page we collected it from, then click the row.
+    const targetPage = _jobPageMap.get(String(jobId));
+    if (targetPage) {
+        await _navigateToDomPage(targetPage);
+        const r = WWScaper.scrapeRowByJobId(jobId);
+        if (r?.titleEl) { r.titleEl.click(); return; }
+    }
+
+    // Fallback: dispatch to MAIN world so interceptor.js can call WW's viewPosting().
+    // Works on Full Cycle jobs board; may be a no-op on My Applications.
     document.dispatchEvent(new CustomEvent('__wwai_open_job', { detail: { postingId: jobId } }));
+}
+
+// Navigates the WW DataViewer table to a specific 1-based page number.
+async function _navigateToDomPage(targetPage) {
+    // Always go to page 1 first (dispatch is a no-op if already there).
+    const idBefore = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
+    document.dispatchEvent(new CustomEvent('__wwai_paginate', { detail: { action: 'first_page' } }));
+    const d1 = Date.now() + 1200;
+    while (Date.now() < d1) {
+        await new Promise(r => setTimeout(r, 80));
+        if ((WWScaper.scrapeAllListingRows()[0]?.jobId ?? '') !== idBefore) break;
+    }
+
+    // Click "next" (targetPage - 1) times.
+    for (let p = 1; p < targetPage; p++) {
+        const idNow = WWScaper.scrapeAllListingRows()[0]?.jobId ?? '';
+        document.dispatchEvent(new CustomEvent('__wwai_paginate', { detail: { selector: 'a[aria-label="Go to next page"]' } }));
+        const d2 = Date.now() + 2000;
+        while (Date.now() < d2) {
+            await new Promise(r => setTimeout(r, 80));
+            if ((WWScaper.scrapeAllListingRows()[0]?.jobId ?? '') !== idNow) break;
+        }
+    }
+    await new Promise(r => setTimeout(r, 150)); // let Vue finish rendering
 }
 
 // ── DOM table filtering (kept for _onTableChange re-apply when overlay is off) ──
