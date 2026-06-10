@@ -533,7 +533,22 @@ async function _handleFreeSearch(query) {
       || /\bsuit(ed)?\s+(me|for\s+me)\b/i.test(query)
       || /\bgood\s+fit\b/i.test(query);
     if (_isFitQuery) {
-        return _handleSearch('top_fits');
+        const fitLimitMatch = query.match(/\b(\d+)\b/);
+        const fitLimit = fitLimitMatch ? parseInt(fitLimitMatch[1], 10) : 10;
+        _clearTableFilter();
+        _setLoading(`Searching "${query}"…`); _clearResult();
+        try {
+            const result = await WWAnalyzer.searchJobs({ criteria: 'top_fits', limit: fitLimit });
+            const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
+            const emptyMsg = SEARCH_EMPTY_MESSAGES.top_fits;
+            const subtitle = jobs.length > 0 && jobs.length < fitLimit
+                ? `Only ${jobs.length} jobs scored — open more jobs to score them`
+                : null;
+            _showSearchOverlay(jobs, query, emptyMsg, null, true);
+            _renderFilterCard(jobs.length, jobs.length, query, emptyMsg, subtitle);
+        } catch (err) { _renderError(err); }
+        finally { _clearLoading(); }
+        return;
     }
 
     if (/\b(highest|top|best|most)\b/i.test(query) && /\b(pay|paying|paid|salary|salaries|compensation|wage|wages|earning|earnings|stipend)\b/i.test(query)) {
@@ -544,10 +559,6 @@ async function _handleFreeSearch(query) {
         try {
             const result = await WWAnalyzer.searchJobs({ criteria: 'top_compensation', limit });
             let jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
-            if (_directScrapeRows?.length) {
-                const currentIds = new Set(_directScrapeRows.map(r => String(r.jobId)));
-                jobs = jobs.filter(j => currentIds.has(String(j.jobId ?? j.id ?? '')));
-            }
             const total = result.total ?? null;
             const hitLimit = total != null ? total > jobs.length : jobs.length === limit;
             const subtitle = hitLimit
@@ -560,6 +571,46 @@ async function _handleFreeSearch(query) {
         finally { _clearLoading(); }
         return;
     }
+    // ── Generic top-N interceptor ────────────────────────────────────────────────
+    // Maps "top N by field" natural language to structured top_n requests.
+    const TOP_N_FIELDS = [
+        { re: /\b(most|highest).{0,10}(appli|app\b|apps\b)/i,      field: 'apps',                   dir: 'desc' },
+        { re: /\b(most|highest).{0,10}(opening|position|spot)/i,   field: 'openings',               dir: 'desc' },
+        { re: /\b(fewest|least).{0,10}(appli|app\b|apps\b)/i,      field: 'apps',                   dir: 'asc'  },
+        { re: /\b(fewest|least).{0,10}(opening|position|spot)/i,   field: 'openings',               dir: 'asc'  },
+        { re: /\b(earliest|soonest|closest).{0,10}(deadline|clos)/i, field: 'deadline',             dir: 'asc'  },
+        { re: /\b(latest|furthest|most.time).{0,10}(deadline)/i,   field: 'deadline',               dir: 'desc' },
+    ];
+    const _isTopN = /\b(top|give me|show me|find me|list).{0,6}\d+\b/i.test(query)
+                 || /\b(most|highest|fewest|least|earliest|soonest|latest)\b/i.test(query);
+    if (_isTopN) {
+        const matchedField = TOP_N_FIELDS.find(f => f.re.test(query));
+        if (matchedField) {
+            const limitMatch = query.match(/\b(\d+)\b/);
+            const topNLimit  = limitMatch ? parseInt(limitMatch[1], 10) : 10;
+            _clearTableFilter();
+            _setLoading(`Searching "${query}"…`); _clearResult();
+            try {
+                const result = await WWAnalyzer.searchJobs({
+                    criteria: 'top_n',
+                    sort_by:  matchedField.field,
+                    sort_dir: matchedField.dir,
+                    limit:    topNLimit,
+                });
+                const jobs     = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
+                const total    = result.total ?? null;
+                const hitLimit = total != null ? total > jobs.length : jobs.length === topNLimit;
+                const subtitle = hitLimit
+                    ? `There are more matches — try a more specific search to narrow results.`
+                    : null;
+                _showSearchOverlay(jobs, query, null, null, true);
+                _renderFilterCard(jobs.length, jobs.length, query, null, subtitle);
+            } catch (err) { _renderError(err); }
+            finally { _clearLoading(); }
+            return;
+        }
+    }
+
     _clearTableFilter();
     _setLoading(`Searching "${query}"…`); _clearResult();
     try {
@@ -593,10 +644,11 @@ async function _handleSearch(searchType) {
         const result = await WWAnalyzer.searchJobs({ criteria: searchType });
         let jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
 
-        // Filter to jobs from the current cycle's All Jobs listing.
-        // _directScrapeRows is populated by Phase 1 from the live listing — any job
-        // not in that set belongs to a previous cycle and should not appear here.
-        if (_directScrapeRows?.length) {
+        // For ranked searches (top_fits, top_compensation) skip the board filter —
+        // scores are user-specific and valid regardless of which board is currently open.
+        // For other search types, restrict to jobs from the current cycle's live listing.
+        const isRanked = searchType === 'top_fits' || searchType === 'top_compensation';
+        if (!isRanked && _directScrapeRows?.length) {
             const currentIds = new Set(_directScrapeRows.map(r => String(r.jobId)));
             jobs = jobs.filter(j => currentIds.has(String(j.jobId ?? j.id ?? '')));
         }
@@ -606,7 +658,6 @@ async function _handleSearch(searchType) {
         const subtitle = (searchType === 'top_fits' && jobs.length > 0 && jobs.length < 10)
             ? `Only ${jobs.length} jobs scored — open more jobs to score them`
             : null;
-        const isRanked = searchType === 'top_fits' || searchType === 'top_compensation';
         _showSearchOverlay(jobs, label, emptyMsg, null, isRanked);
         _renderFilterCard(jobs.length, jobs.length, label, emptyMsg, subtitle);
     } catch (err) {
