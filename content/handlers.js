@@ -573,13 +573,17 @@ async function _handleFreeSearch(query) {
         return;
     }
 
-    if (/\b(highest|top|best|most)\b/i.test(query) && /\b(pay|paying|paid|salary|salaries|compensation|wage|wages|earning|earnings|stipend)\b/i.test(query)) {
+    if (/\b(highest|top|best|most|lowest|cheapest|minimum|least)\b/i.test(query) && /\b(pay|paying|paid|salary|salaries|compensation|wage|wages|earning|earnings|stipend)\b/i.test(query)) {
         const limitMatch = query.match(/\b(\d+)\b/);
         const limit = limitMatch ? parseInt(limitMatch[1], 10) : 10;
+        const isAsc = /\b(lowest|cheapest|minimum|least)\b/i.test(query);
         _clearTableFilter();
         _setLoading(`Searching "${query}"…`); _clearResult();
         try {
-            const result = await WWAnalyzer.searchJobs({ criteria: 'top_compensation', limit });
+            const payload = isAsc
+                ? { criteria: 'top_n', sort_by: 'compensation_hourly_cad', sort_dir: 'asc', limit }
+                : { criteria: 'top_compensation', limit };
+            const result = await WWAnalyzer.searchJobs(payload);
             let jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
             const requestedLimit = result.requested_limit ?? limit;
             const hitLimit = jobs.length < requestedLimit;
