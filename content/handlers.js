@@ -1429,9 +1429,11 @@ function _showSearchOverlay(jobs, query, emptyMsg, titleOverride = null) {
             const score  = job.fitScore ?? job.fit_score ?? cached?.fitScore ?? cached?.fit_score
                         ?? _persistedFitScores[jobId] ?? null;
             if (score != null) {
+                const tier    = score >= 70 ? 'great' : score >= 40 ? 'decent' : 'poor';
+                const verdict = score >= 70 ? 'Great fit' : score >= 40 ? 'Decent' : 'Weak fit';
                 const badge = document.createElement('span');
-                badge.className = `wwai-overlay-badge wwai-overlay-badge--${score >= 70 ? 'great' : score >= 40 ? 'decent' : 'poor'}`;
-                badge.textContent = String(score);
+                badge.className = `wwai-overlay-badge wwai-overlay-badge--${tier}`;
+                badge.textContent = `${score} · ${verdict}`;
                 tdFit.appendChild(badge);
             }
 
