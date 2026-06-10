@@ -559,8 +559,8 @@ async function _handleFreeSearch(query) {
         try {
             const result = await WWAnalyzer.searchJobs({ criteria: 'top_compensation', limit });
             let jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
-            const total = result.total ?? null;
-            const hitLimit = total != null ? total > jobs.length : jobs.length === limit;
+            const requestedLimit = result.requested_limit ?? limit;
+            const hitLimit = jobs.length < requestedLimit;
             const subtitle = hitLimit
                 ? `There are more matches — try a more specific search (e.g. add a city, role, or term) to narrow results.`
                 : null;
@@ -597,9 +597,9 @@ async function _handleFreeSearch(query) {
                     sort_dir: matchedField.dir,
                     limit:    topNLimit,
                 });
-                const jobs     = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
-                const total    = result.total ?? null;
-                const hitLimit = total != null ? total > jobs.length : jobs.length === topNLimit;
+                const jobs             = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
+                const requestedLimit   = result.requested_limit ?? topNLimit;
+                const hitLimit         = jobs.length < requestedLimit;
                 const subtitle = hitLimit
                     ? `There are more matches — try a more specific search to narrow results.`
                     : null;
