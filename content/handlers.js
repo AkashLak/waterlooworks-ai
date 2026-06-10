@@ -1429,6 +1429,8 @@ async function _openJobFromOverlay(jobId) {
     const domRows = WWScaper.scrapeAllListingRows();
     console.log('[WWAI overlay] opening job', jobId, 'row found:', !!row, 'titleEl:', !!row?.titleEl, '_jobPageMap size:', _jobPageMap.size, 'targetPage:', _jobPageMap.get(String(jobId)));
     console.log('[WWAI overlay] DOM rows on current page:', domRows.length, '| first 5 ids:', domRows.slice(0,5).map(r=>r.jobId));
+    const firstTr = document.querySelector('tr.table__row--body');
+    if (firstTr) console.log('[WWAI overlay] first row outerHTML:', firstTr.outerHTML.slice(0, 600));
     if (row?.titleEl) {
         console.log('[WWAI overlay] clicking titleEl for job', jobId);
         row.titleEl.click();
