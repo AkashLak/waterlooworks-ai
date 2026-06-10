@@ -567,11 +567,11 @@ async function _handleSearch(searchType) {
 
         const label    = SEARCH_LABELS[searchType] ?? searchType;
         const emptyMsg = SEARCH_EMPTY_MESSAGES[searchType] ?? null;
-        const titleOverride = (searchType === 'top_fits' && jobs.length > 0 && jobs.length < 10)
-            ? `${jobs.length} scored fits (only ${jobs.length} jobs scored — run Score All Jobs to rank more)`
+        const subtitle = (searchType === 'top_fits' && jobs.length > 0 && jobs.length < 10)
+            ? `Only ${jobs.length} jobs scored — run Score All Jobs to rank more`
             : null;
-        _showSearchOverlay(jobs, label, emptyMsg, titleOverride);
-        _renderFilterCard(jobs.length, jobs.length, label, emptyMsg);
+        _showSearchOverlay(jobs, label, emptyMsg);
+        _renderFilterCard(jobs.length, jobs.length, label, emptyMsg, subtitle);
     } catch (err) {
         _renderError(err);
     } finally {
@@ -1493,7 +1493,7 @@ function _clearTableFilter() {
     document.querySelectorAll('tr.table__row--body').forEach(tr => { tr.style.display = ''; });
 }
 
-function _renderFilterCard(shown, total, query, emptyMsg) {
+function _renderFilterCard(shown, total, query, emptyMsg, subtitle = null) {
     const container = document.getElementById('wwai-result');
     container.innerHTML = '';
     container.classList.remove('wwai-hidden');
@@ -1506,12 +1506,19 @@ function _renderFilterCard(shown, total, query, emptyMsg) {
     const p = document.createElement('p');
     p.className = 'wwai-verdict';
     p.textContent = msg;
+    card.appendChild(p);
+    if (subtitle) {
+        const sub = document.createElement('p');
+        sub.className = 'wwai-verdict';
+        sub.style.cssText = 'font-size:0.82em;opacity:0.7;margin-top:4px;';
+        sub.textContent = subtitle;
+        card.appendChild(sub);
+    }
     const btn = document.createElement('button');
     btn.className = 'wwai-btn wwai-btn--full';
     btn.style.marginTop = '8px';
     btn.textContent = 'Clear Filter';
     btn.addEventListener('click', () => { _clearTableFilter(); _clearResult(); _show('wwai-empty'); });
-    card.appendChild(p);
     card.appendChild(btn);
     container.appendChild(card);
 }
