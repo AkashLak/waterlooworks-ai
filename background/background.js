@@ -157,12 +157,14 @@ async function _sha256(text) {
 }
 
 async function _handleSyncFitScores() {
-    const scores = await WWStorage.getFitScores();
+    const [scores, resume] = await Promise.all([WWStorage.getFitScores(), WWStorage.getResume()]);
+    if (!resume) return { synced: 0 }; // can't identify student without resume
+    const resumeHash = await _sha256(resume);
     const payload = Object.entries(scores ?? {})
         .filter(([, score]) => score != null)
         .map(([jobId, fitScore]) => ({ jobId, fitScore }));
     if (!payload.length) return { synced: 0 };
-    return WWApi.syncFitScores(payload);
+    return WWApi.syncFitScores(payload, resumeHash);
 }
 
 async function _requireResume() {

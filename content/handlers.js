@@ -36,6 +36,13 @@ function _getTermKey() {
     return `${y}_winter`;
 }
 
+// Returns the current WW work term string (e.g. "2026 - Fall") from the live listing rows,
+// or null if rows haven't loaded yet. Never derives from calendar date — WW terms represent
+// the work period being applied for, not the current calendar season.
+function _getCurrentTerm() {
+    return _directScrapeRows?.find(r => r.term)?.term ?? null;
+}
+
 function _extractExternalAppUrl(text) {
     for (const match of text.matchAll(/https?:\/\/[^\s,)]+/g)) {
         const before = text.slice(Math.max(0, match.index - 200), match.index).toLowerCase();
@@ -538,7 +545,10 @@ async function _handleFreeSearch(query) {
         _clearTableFilter();
         _setLoading(`Searching "${query}"…`); _clearResult();
         try {
-            const result = await WWAnalyzer.searchJobs({ criteria: 'top_fits', limit: fitLimit });
+            const fitPayload = { criteria: 'top_fits', limit: fitLimit };
+            const fitTerm = _getCurrentTerm();
+            if (fitTerm) fitPayload.term = fitTerm;
+            const result = await WWAnalyzer.searchJobs(fitPayload);
             const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
             const emptyMsg = SEARCH_EMPTY_MESSAGES.top_fits;
             const subtitle = jobs.length > 0 && jobs.length < fitLimit
@@ -641,7 +651,12 @@ async function _handleSearch(searchType) {
     _setLoading(`Searching ${SEARCH_LABELS[searchType] ?? searchType}…`);
     _clearResult();
     try {
-        const result = await WWAnalyzer.searchJobs({ criteria: searchType });
+        const searchPayload = { criteria: searchType };
+        if (searchType === 'top_fits') {
+            const term = _getCurrentTerm();
+            if (term) searchPayload.term = term;
+        }
+        const result = await WWAnalyzer.searchJobs(searchPayload);
         let jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
 
         // For ranked searches (top_fits, top_compensation) skip the board filter —
