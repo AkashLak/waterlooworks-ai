@@ -354,11 +354,18 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
 
     // Load persisted fit scores so badges survive tab close/reopen.
     // Also push them to Supabase so top_fits returns all jobs the user has ever scored.
+    // Delay the sync so the background service worker has time to fully initialize —
+    // MV3 SWs are terminated after inactivity and need ~1s to wake up on page load.
     WWStorage.getFitScores().then(scores => {
         _persistedFitScores = scores ?? {};
         _scheduleTableSync(); // re-inject badges now that scores are available
         if (Object.keys(_persistedFitScores).length) {
-            WWAnalyzer.syncFitScores().catch(() => {});
+            setTimeout(() => {
+                WWAnalyzer.syncFitScores().catch(() => {
+                    // Retry once after 5s if the first attempt fails (SW may still be waking)
+                    setTimeout(() => WWAnalyzer.syncFitScores().catch(() => {}), 5000);
+                });
+            }, 1500);
         }
     });
 

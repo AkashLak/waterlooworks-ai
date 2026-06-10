@@ -548,8 +548,20 @@ async function _handleFreeSearch(query) {
             const fitPayload = { criteria: 'top_fits', limit: fitLimit };
             const fitTerm = _getCurrentTerm();
             if (fitTerm) fitPayload.term = fitTerm;
-            const result = await WWAnalyzer.searchJobs(fitPayload);
-            const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
+            let result = await WWAnalyzer.searchJobs(fitPayload);
+            let jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
+            // If fewer results than requested, local scores may not be in Supabase yet —
+            // sync and retry once, but only re-fetch if sync actually pushed new scores.
+            if (jobs.length < fitLimit) {
+                try {
+                    const synced = await WWAnalyzer.syncFitScores();
+                    if ((synced?.synced ?? 0) > 0) {
+                        const retried = await WWAnalyzer.searchJobs(fitPayload);
+                        const retriedJobs = retried.jobs ?? retried.results ?? [];
+                        if (retriedJobs.length > jobs.length) { result = retried; jobs = retriedJobs; }
+                    }
+                } catch (_) {}
+            }
             const emptyMsg = result.message || SEARCH_EMPTY_MESSAGES.top_fits;
             const subtitle = jobs.length > 0 && jobs.length < fitLimit
                 ? `Only ${jobs.length} jobs scored — open more jobs to score them`
@@ -657,8 +669,21 @@ async function _handleSearch(searchType) {
             const term = _getCurrentTerm();
             if (term) searchPayload.term = term;
         }
-        const result = await WWAnalyzer.searchJobs(searchPayload);
+        let result = await WWAnalyzer.searchJobs(searchPayload);
         let jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
+
+        // For top_fits, if fewer results than the default limit (10), local scores may not
+        // be in Supabase yet — sync and retry once, but only re-fetch if sync pushed new scores.
+        if (searchType === 'top_fits' && jobs.length < 10) {
+            try {
+                const synced = await WWAnalyzer.syncFitScores();
+                if ((synced?.synced ?? 0) > 0) {
+                    const retried = await WWAnalyzer.searchJobs(searchPayload);
+                    const retriedJobs = retried.jobs ?? retried.results ?? [];
+                    if (retriedJobs.length > jobs.length) { result = retried; jobs = retriedJobs; }
+                }
+            } catch (_) {}
+        }
 
         // Ranked searches (top_fits, top_compensation, hidden_gems) are user-specific —
         // skip the board filter so cross-board results are included.
