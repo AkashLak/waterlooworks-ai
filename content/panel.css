@@ -413,6 +413,12 @@
     text-decoration-color: #a8c4f5;
 }
 
+.wwai-overlay-pay {
+    white-space: nowrap;
+    font-size: 12px;
+    color: #374151;
+}
+
 .wwai-overlay-badge {
     display: inline-block;
     font-size: 11px;

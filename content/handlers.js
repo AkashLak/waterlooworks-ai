@@ -492,7 +492,7 @@ async function _handleAsk(question) {
 
 // ── Smart Suggestions ──────────────────────────────────────────────────────────
 
-const SEARCH_LABELS = { top_fits: 'Top 10 Fits', closing_soon: 'Closing in 3 Days' };
+const SEARCH_LABELS = { top_fits: 'Top 10 Fits', closing_soon: 'Closing in 3 Days', top_compensation: 'Top Pay' };
 
 async function _handleShouldIApply() {
     if (!_currentJobId) return;
@@ -521,8 +521,9 @@ async function _handleShouldIApply() {
 }
 
 const SEARCH_EMPTY_MESSAGES = {
-    closing_soon: 'No jobs closing within 3 days — deadlines may have passed or these jobs haven\'t been analyzed yet.',
-    top_fits:     'No fit scores yet — open some job postings and run Score All Jobs to build your Top 10.',
+    closing_soon:      'No jobs closing within 3 days — deadlines may have passed or these jobs haven\'t been analyzed yet.',
+    top_fits:          'No fit scores yet — open some job postings to build your Top 10.',
+    top_compensation:  'No compensation data yet — job descriptions need to be loaded before pay can be ranked.',
 };
 
 async function _handleFreeSearch(query) {
@@ -536,6 +537,8 @@ async function _handleFreeSearch(query) {
         if (!jobs.length) {
             if (_directScrapeState < 4 && /\b(month|hybrid|remote|in.person|on.?site|arrangement|skill|education|duration|gpa)\b/i.test(query)) {
                 emptyMsg = 'Work term duration, hybrid/remote, and skills details aren\'t loaded yet — click any job title once, then search again.';
+            } else if (/\b(pay|paid|salary|salaries|compensation|compens|wage|wages|highest.pay|top.pay|best.pay|earn|earning|hourly|stipend)\b/i.test(query)) {
+                emptyMsg = 'Looks like a pay question — try the "💰 Top Pay" button below to rank jobs by compensation.';
             } else if (/\b(best|good for me|suit me|match|recommend|should i|qualify|top fits?|fit for)\b/i.test(query)) {
                 emptyMsg = 'Looks like a fit question — try the "🎯 Top 10 Fits for Me" button below, which uses your resume to find your best matches.';
             } else {
@@ -1344,7 +1347,7 @@ function _showSearchOverlay(jobs, query, emptyMsg, titleOverride = null) {
 
         const thead = document.createElement('thead');
         const htr = document.createElement('tr');
-        ['Job Title', 'Employer', 'City', 'Term', 'Deadline', 'Fit'].forEach(label => {
+        ['Job Title', 'Employer', 'City', 'Term', 'Deadline', 'Pay', 'Fit'].forEach(label => {
             const th = document.createElement('th');
             th.textContent = label;
             htr.appendChild(th);
@@ -1390,6 +1393,12 @@ function _showSearchOverlay(jobs, query, emptyMsg, titleOverride = null) {
             const rawDeadline = job.deadline ?? job.app_deadline ?? stored.deadline ?? stored.app_deadline ?? '';
             tdDead.textContent = rawDeadline ? _formatDate(rawDeadline) : '';
 
+            const tdPay = document.createElement('td');
+            tdPay.className = 'wwai-overlay-pay';
+            const rawPay = job.compensation_and_benefits ?? stored.compensation_and_benefits
+                        ?? job.compensation_raw ?? stored.compensation_raw ?? '';
+            tdPay.textContent = rawPay;
+
             const tdFit = document.createElement('td');
             const cached = _getCached(jobId, 'BATCH_FIT') ?? _getCached(jobId, 'BEST_FIT');
             const score  = job.fitScore ?? job.fit_score ?? cached?.fitScore ?? cached?.fit_score
@@ -1402,7 +1411,7 @@ function _showSearchOverlay(jobs, query, emptyMsg, titleOverride = null) {
             }
 
             tr.appendChild(tdTitle); tr.appendChild(tdEmp);  tr.appendChild(tdCity);
-            tr.appendChild(tdTerm);  tr.appendChild(tdDead); tr.appendChild(tdFit);
+            tr.appendChild(tdTerm);  tr.appendChild(tdDead); tr.appendChild(tdPay); tr.appendChild(tdFit);
             tbody.appendChild(tr);
         }
         table.appendChild(tbody);
