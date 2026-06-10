@@ -527,7 +527,7 @@ const SEARCH_EMPTY_MESSAGES = {
 };
 
 async function _handleFreeSearch(query) {
-    if (/\b(highest.pay|top.pay|best.pay|highest.salary|top.salary|most.paid|highest.paid|highest.compensation|top.compensation|highest.wage|best.wage|highest.earning)\b/i.test(query)) {
+    if (/\b(highest|top|best|most)\b/i.test(query) && /\b(pay|paying|paid|salary|salaries|compensation|wage|wages|earning|earnings|stipend)\b/i.test(query)) {
         return _handleSearch('top_compensation');
     }
     _clearTableFilter();
