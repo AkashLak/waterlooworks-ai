@@ -530,7 +530,7 @@ async function _handleShouldIApply() {
 const SEARCH_EMPTY_MESSAGES = {
     top_fits:         'No fit scores yet — open some job postings to build your Top 10.',
     top_compensation: 'No compensation data yet — job descriptions need to be loaded before pay can be ranked.',
-    hidden_gems:      'No hidden gems yet — open more job postings to score them, then check back.',
+    hidden_gems:      'No hidden gems found — applicant counts are only available on the main jobs board. Browse there first, then try again.',
 };
 
 async function _handleFreeSearch(query) {
@@ -667,8 +667,11 @@ async function _handleSearch(searchType) {
             jobs = jobs.filter(j => currentIds.has(String(j.jobId ?? j.id ?? '')));
         }
 
-        const label    = SEARCH_LABELS[searchType] ?? searchType;
-        const emptyMsg = SEARCH_EMPTY_MESSAGES[searchType] ?? null;
+        const label  = SEARCH_LABELS[searchType] ?? searchType;
+        const reason = result.reason ?? null;
+        const emptyMsg = (searchType === 'hidden_gems' && reason === 'no_apps_data')
+            ? 'Hidden Gems needs applicant count data — browse the main jobs board first, then try again.'
+            : SEARCH_EMPTY_MESSAGES[searchType] ?? null;
         const subtitle = (searchType === 'top_fits' && jobs.length > 0 && jobs.length < 10)
             ? `Only ${jobs.length} jobs scored — open more jobs to score them`
             : null;
