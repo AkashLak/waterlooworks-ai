@@ -1426,7 +1426,9 @@ async function _openJobFromOverlay(jobId) {
 
     // If the job row is on the current WW page, click its title link directly.
     const row = WWScaper.scrapeRowByJobId(jobId);
+    const domRows = WWScaper.scrapeAllListingRows();
     console.log('[WWAI overlay] opening job', jobId, 'row found:', !!row, 'titleEl:', !!row?.titleEl, '_jobPageMap size:', _jobPageMap.size, 'targetPage:', _jobPageMap.get(String(jobId)));
+    console.log('[WWAI overlay] DOM rows on current page:', domRows.length, '| first 5 ids:', domRows.slice(0,5).map(r=>r.jobId));
     if (row?.titleEl) {
         console.log('[WWAI overlay] clicking titleEl for job', jobId);
         row.titleEl.click();
@@ -1440,7 +1442,9 @@ async function _openJobFromOverlay(jobId) {
         console.log('[WWAI overlay] navigating to page', targetPage, 'for job', jobId);
         await _navigateToDomPage(targetPage);
         const r = WWScaper.scrapeRowByJobId(jobId);
+        const domRows2 = WWScaper.scrapeAllListingRows();
         console.log('[WWAI overlay] after nav, row found:', !!r, 'titleEl:', !!r?.titleEl);
+        console.log('[WWAI overlay] DOM rows after nav:', domRows2.length, '| first 5 ids:', domRows2.slice(0,5).map(r=>r.jobId));
         if (r?.titleEl) { r.titleEl.click(); return; }
     }
 
