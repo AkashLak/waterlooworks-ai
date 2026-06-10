@@ -499,7 +499,7 @@ async function _handleAsk(question) {
 
 // ── Smart Suggestions ──────────────────────────────────────────────────────────
 
-const SEARCH_LABELS = { top_fits: 'Top 10 Fits', closing_soon: 'Closing in 3 Days', top_compensation: 'Top Pay' };
+const SEARCH_LABELS = { top_fits: 'Top 10 Fits', top_compensation: 'Top Pay', hidden_gems: 'Hidden Gems' };
 
 async function _handleShouldIApply() {
     if (!_currentJobId) return;
@@ -528,9 +528,9 @@ async function _handleShouldIApply() {
 }
 
 const SEARCH_EMPTY_MESSAGES = {
-    closing_soon:      'No jobs closing within 3 days — deadlines may have passed or these jobs haven\'t been analyzed yet.',
-    top_fits:          'No fit scores yet — open some job postings to build your Top 10.',
-    top_compensation:  'No compensation data yet — job descriptions need to be loaded before pay can be ranked.',
+    top_fits:         'No fit scores yet — open some job postings to build your Top 10.',
+    top_compensation: 'No compensation data yet — job descriptions need to be loaded before pay can be ranked.',
+    hidden_gems:      'No hidden gems yet — open more job postings to score them, then check back.',
 };
 
 async function _handleFreeSearch(query) {
@@ -652,17 +652,16 @@ async function _handleSearch(searchType) {
     _clearResult();
     try {
         const searchPayload = { criteria: searchType };
-        if (searchType === 'top_fits') {
+        if (searchType === 'top_fits' || searchType === 'hidden_gems') {
             const term = _getCurrentTerm();
             if (term) searchPayload.term = term;
         }
         const result = await WWAnalyzer.searchJobs(searchPayload);
         let jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
 
-        // For ranked searches (top_fits, top_compensation) skip the board filter —
-        // scores are user-specific and valid regardless of which board is currently open.
-        // For other search types, restrict to jobs from the current cycle's live listing.
-        const isRanked = searchType === 'top_fits' || searchType === 'top_compensation';
+        // Ranked searches (top_fits, top_compensation, hidden_gems) are user-specific —
+        // skip the board filter so cross-board results are included.
+        const isRanked = searchType === 'top_fits' || searchType === 'top_compensation' || searchType === 'hidden_gems';
         if (!isRanked && _directScrapeRows?.length) {
             const currentIds = new Set(_directScrapeRows.map(r => String(r.jobId)));
             jobs = jobs.filter(j => currentIds.has(String(j.jobId ?? j.id ?? '')));
@@ -675,6 +674,40 @@ async function _handleSearch(searchType) {
             : null;
         _showSearchOverlay(jobs, label, emptyMsg, null, isRanked);
         _renderFilterCard(jobs.length, jobs.length, label, emptyMsg, subtitle);
+    } catch (err) {
+        _renderError(err);
+    } finally {
+        _clearLoading();
+    }
+}
+
+async function _handleNewPostings() {
+    const input = document.getElementById('wwai-days-input');
+    const raw   = input?.value?.trim();
+    const days  = parseInt(raw, 10);
+
+    if (!raw || isNaN(days) || days <= 0) {
+        _renderError({ message: 'Please enter a valid number of days (e.g. 7).' });
+        _show('wwai-result');
+        return;
+    }
+    if (days > 365) {
+        _renderError({ message: 'Please enter 365 days or fewer.' });
+        _show('wwai-result');
+        return;
+    }
+
+    const label    = `New in last ${days} day${days !== 1 ? 's' : ''}`;
+    const emptyMsg = `No jobs posted in the last ${days} day${days !== 1 ? 's' : ''} — try a larger window.`;
+
+    _clearTableFilter();
+    _setLoading(`Finding jobs posted in the last ${days} day${days !== 1 ? 's' : ''}…`);
+    _clearResult();
+    try {
+        const result = await WWAnalyzer.searchJobs({ criteria: 'new_postings', days });
+        const jobs   = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
+        _showSearchOverlay(jobs, label, emptyMsg);
+        _renderFilterCard(jobs.length, jobs.length, label, emptyMsg);
     } catch (err) {
         _renderError(err);
     } finally {
@@ -1468,9 +1501,15 @@ function _showSearchOverlay(jobs, query, emptyMsg, titleOverride = null, ranked 
             _openJobFromOverlay(row.dataset.jobId);
         });
 
-        for (const [rankIdx, job] of jobs.entries()) {
+        // ── Load-more pagination ───────────────────────────────────────────────
+        // Renders jobs in batches of BATCH_SIZE. All results come from the backend
+        // in one response; we just throttle DOM insertion so the first rows appear
+        // instantly regardless of result count.
+        const BATCH_SIZE = 30;
+        let rendered = 0;
+
+        function _buildRow(job, rankIdx) {
             const jobId = String(job.jobId ?? job.id ?? '');
-            // Search results only carry AI-scoring fields — fill gaps from the full jobs snapshot
             const stored = _allJobsMap[jobId] ?? {};
             const tr = document.createElement('tr');
             tr.className = 'wwai-overlay-row';
@@ -1524,8 +1563,38 @@ function _showSearchOverlay(jobs, query, emptyMsg, titleOverride = null, ranked 
             }
             tr.appendChild(tdTitle); tr.appendChild(tdEmp);  tr.appendChild(tdCity);
             tr.appendChild(tdTerm);  tr.appendChild(tdDead); tr.appendChild(tdPay); tr.appendChild(tdFit);
-            tbody.appendChild(tr);
+            return tr;
         }
+
+        // "Load more" footer row — updated or removed as batches are appended
+        const loadMoreTr = document.createElement('tr');
+        const loadMoreTd = document.createElement('td');
+        loadMoreTd.colSpan = headers.length;
+        loadMoreTd.style.cssText = 'text-align:center;padding:12px 0;';
+        const loadMoreBtn = document.createElement('button');
+        loadMoreBtn.className = 'wwai-btn';
+        loadMoreBtn.style.cssText = 'font-size:12px;padding:6px 20px;';
+        loadMoreTd.appendChild(loadMoreBtn);
+        loadMoreTr.appendChild(loadMoreTd);
+
+        function _appendBatch() {
+            const end = Math.min(rendered + BATCH_SIZE, jobs.length);
+            for (let i = rendered; i < end; i++) {
+                tbody.insertBefore(_buildRow(jobs[i], i), loadMoreTr);
+            }
+            rendered = end;
+            if (rendered >= jobs.length) {
+                loadMoreTr.remove();
+            } else {
+                const remaining = jobs.length - rendered;
+                loadMoreBtn.textContent = `Load ${Math.min(BATCH_SIZE, remaining)} more — ${remaining} remaining`;
+            }
+        }
+
+        loadMoreBtn.addEventListener('click', _appendBatch);
+        tbody.appendChild(loadMoreTr);
+        _appendBatch(); // render first batch immediately
+
         table.appendChild(tbody);
         bodyEl.appendChild(table);
     }

@@ -340,6 +340,50 @@
     transform: translateX(-1px);
 }
 
+.wwai-new-postings-bar {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: #fff;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 7px 10px;
+    transition: border-color 0.12s, box-shadow 0.12s;
+}
+.wwai-new-postings-bar:focus-within {
+    border-color: #FFC72C;
+    box-shadow: 0 0 0 3px rgba(255,199,44,0.12);
+}
+.wwai-new-postings-bar__label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    white-space: nowrap;
+}
+.wwai-new-postings-bar__input {
+    width: 44px;
+    padding: 2px 4px;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 5px;
+    font-size: 12px;
+    font-family: inherit;
+    text-align: center;
+    outline: none;
+    background: #f8f9fb;
+    transition: border-color 0.12s;
+    -moz-appearance: textfield;
+}
+.wwai-new-postings-bar__input::-webkit-outer-spin-button,
+.wwai-new-postings-bar__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.wwai-new-postings-bar__input:focus { border-color: #FFC72C; }
+.wwai-new-postings-bar__btn {
+    margin-left: auto;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 6px;
+}
+
 .wwai-status-line {
     font-size: 11px;
     color: #9ca3af;

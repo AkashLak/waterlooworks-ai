@@ -79,8 +79,14 @@ function _buildPanel() {
             <hr class="wwai-divider">
             <div class="wwai-suggestions" id="wwai-suggestions">
                 <div class="wwai-suggestions__title">Smart Suggestions</div>
-                <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="closing_soon">⏰ Closing in 3 Days</button>
                 <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="top_fits">🎯 Top 10 Fits for Me</button>
+                <button class="wwai-btn wwai-btn--full wwai-btn--suggestion" data-search="hidden_gems">💎 Hidden Gems</button>
+                <div class="wwai-new-postings-bar">
+                    <span class="wwai-new-postings-bar__label">🆕 Posted in last</span>
+                    <input class="wwai-new-postings-bar__input" id="wwai-days-input" type="number" min="1" max="365" value="7" aria-label="Number of days">
+                    <span class="wwai-new-postings-bar__label">days</span>
+                    <button class="wwai-btn wwai-btn--suggestion wwai-new-postings-bar__btn" id="wwai-new-postings-btn">Go</button>
+                </div>
                 <div class="wwai-search-bar">
                     <input class="wwai-search-bar__input" id="wwai-search-input" type="text"
                         placeholder="Search &amp; filter… e.g. remote, Toronto &gt; 8 months">
@@ -149,6 +155,9 @@ function _wireEvents(panel) {
     const searchGo = () => { const q = searchInput.value.trim(); if (q) _handleFreeSearch(q); };
     document.getElementById('wwai-search-btn').addEventListener('click', searchGo);
     searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchGo(); });
+
+    document.getElementById('wwai-new-postings-btn').addEventListener('click', _handleNewPostings);
+    document.getElementById('wwai-days-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') _handleNewPostings(); });
 
     document.getElementById('wwai-report-btn').addEventListener('click', _handleReport);
 
