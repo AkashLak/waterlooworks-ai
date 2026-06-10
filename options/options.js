@@ -104,32 +104,24 @@ async function _handleSave() {
     }
 
     saveBtn.disabled = true;
-    _showStatus('Saving and testing connection…', 'loading');
+    _showStatus('Saving…', 'loading');
 
     await WWStorage.saveResume(text);
     _setResumeCheck(true);
 
-    // Test that the backend is reachable
     chrome.runtime.sendMessage({ action: 'testConnection' }, (response) => {
         saveBtn.disabled = false;
 
-        if (chrome.runtime.lastError) {
+        if (chrome.runtime.lastError || !response?.success) {
             _showStatus(
-                'Resume saved. Could not reach the extension background — try reloading.',
-                'error',
+                '✓ Resume saved! (Could not verify connection — reload WaterlooWorks if analysis seems slow.)',
+                'success',
             );
             return;
         }
 
-        if (response?.success) {
-            _showStatus('✓ Resume saved! Backend connection confirmed.', 'success');
-            WWStorage.setOnboardingComplete();
-        } else {
-            _showStatus(
-                'Resume saved, but could not reach the backend. Check your connection and try again.',
-                'error',
-            );
-        }
+        _showStatus('✓ Resume saved! You\'re all set.', 'success');
+        WWStorage.setOnboardingComplete();
     });
 }
 

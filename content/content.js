@@ -362,6 +362,7 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
                 .forEach(k => sessionStorage.removeItem(k));
             WWStorage.clearFitScores();
             _persistedFitScores = {};
+            document.querySelectorAll('.wwai-badge').forEach(b => b.remove());
             _clearResult();
         }
         if ('ww_dream_criteria' in changes) {
