@@ -528,7 +528,28 @@ const SEARCH_EMPTY_MESSAGES = {
 
 async function _handleFreeSearch(query) {
     if (/\b(highest|top|best|most)\b/i.test(query) && /\b(pay|paying|paid|salary|salaries|compensation|wage|wages|earning|earnings|stipend)\b/i.test(query)) {
-        return _handleSearch('top_compensation');
+        const limitMatch = query.match(/\b(\d+)\b/);
+        const limit = limitMatch ? parseInt(limitMatch[1], 10) : 10;
+        _clearTableFilter();
+        _setLoading(`Searching "${query}"…`); _clearResult();
+        try {
+            const result = await WWAnalyzer.searchJobs({ criteria: 'top_compensation', limit });
+            let jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
+            if (_directScrapeRows?.length) {
+                const currentIds = new Set(_directScrapeRows.map(r => String(r.jobId)));
+                jobs = jobs.filter(j => currentIds.has(String(j.jobId ?? j.id ?? '')));
+            }
+            const total = result.total ?? null;
+            const hitLimit = total != null ? total > jobs.length : jobs.length === limit;
+            const subtitle = hitLimit
+                ? `There are more matches — try a more specific search (e.g. add a city, role, or term) to narrow results.`
+                : null;
+            const emptyMsg = SEARCH_EMPTY_MESSAGES.top_compensation;
+            _showSearchOverlay(jobs, query, emptyMsg);
+            _renderFilterCard(jobs.length, jobs.length, query, emptyMsg, subtitle);
+        } catch (err) { _renderError(err); }
+        finally { _clearLoading(); }
+        return;
     }
     _clearTableFilter();
     _setLoading(`Searching "${query}"…`); _clearResult();
@@ -1400,7 +1421,8 @@ function _showSearchOverlay(jobs, query, emptyMsg, titleOverride = null) {
             tdPay.className = 'wwai-overlay-pay';
             const rawPay = job.compensation_and_benefits ?? stored.compensation_and_benefits
                         ?? job.compensation_raw ?? stored.compensation_raw ?? '';
-            tdPay.textContent = rawPay;
+            tdPay.textContent = rawPay.length > 50 ? rawPay.slice(0, 47) + '…' : rawPay;
+            if (rawPay) tdPay.title = rawPay;
 
             const tdFit = document.createElement('td');
             const cached = _getCached(jobId, 'BATCH_FIT') ?? _getCached(jobId, 'BEST_FIT');
