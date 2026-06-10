@@ -83,6 +83,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'askQuestion':
             return respond(_handleAskQuestion(message.jobId, message.question));
 
+        case 'syncFitScores':
+            return respond(_handleSyncFitScores());
+
         case 'getStatus':
         case 'testConnection': // alias used by options page
             return respond(WWApi.getStatus());
@@ -151,6 +154,15 @@ async function _handleGetAllJobs(filters) {
 async function _sha256(text) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function _handleSyncFitScores() {
+    const scores = await WWStorage.getFitScores();
+    const payload = Object.entries(scores ?? {})
+        .filter(([, score]) => score != null)
+        .map(([jobId, fitScore]) => ({ jobId, fitScore }));
+    if (!payload.length) return { synced: 0 };
+    return WWApi.syncFitScores(payload);
 }
 
 async function _requireResume() {

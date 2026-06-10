@@ -343,10 +343,14 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
     }
     WWStorage.getResume().then(r => _updateResumeStatus(!!r));
 
-    // Load persisted fit scores so badges survive tab close/reopen
+    // Load persisted fit scores so badges survive tab close/reopen.
+    // Also push them to Supabase so top_fits returns all jobs the user has ever scored.
     WWStorage.getFitScores().then(scores => {
         _persistedFitScores = scores ?? {};
         _scheduleTableSync(); // re-inject badges now that scores are available
+        if (Object.keys(_persistedFitScores).length) {
+            WWAnalyzer.syncFitScores().catch(() => {});
+        }
     });
 
     chrome.storage.onChanged.addListener((changes, area) => {
