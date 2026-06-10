@@ -527,6 +527,15 @@ const SEARCH_EMPTY_MESSAGES = {
 };
 
 async function _handleFreeSearch(query) {
+    const _isFitQuery = (
+        /\b(top|best|highest)\b/i.test(query) && /\bfit(s|ting)?\b/i.test(query)
+    ) || /\bfit(s|ting)?\s+for\s+me\b/i.test(query)
+      || /\bsuit(ed)?\s+(me|for\s+me)\b/i.test(query)
+      || /\bgood\s+fit\b/i.test(query);
+    if (_isFitQuery) {
+        return _handleSearch('top_fits');
+    }
+
     if (/\b(highest|top|best|most)\b/i.test(query) && /\b(pay|paying|paid|salary|salaries|compensation|wage|wages|earning|earnings|stipend)\b/i.test(query)) {
         const limitMatch = query.match(/\b(\d+)\b/);
         const limit = limitMatch ? parseInt(limitMatch[1], 10) : 10;
@@ -545,7 +554,7 @@ async function _handleFreeSearch(query) {
                 ? `There are more matches — try a more specific search (e.g. add a city, role, or term) to narrow results.`
                 : null;
             const emptyMsg = SEARCH_EMPTY_MESSAGES.top_compensation;
-            _showSearchOverlay(jobs, query, emptyMsg);
+            _showSearchOverlay(jobs, query, emptyMsg, null, true);
             _renderFilterCard(jobs.length, jobs.length, query, emptyMsg, subtitle);
         } catch (err) { _renderError(err); }
         finally { _clearLoading(); }
@@ -563,7 +572,7 @@ async function _handleFreeSearch(query) {
                 emptyMsg = 'Work term duration, hybrid/remote, and skills details aren\'t loaded yet — click any job title once, then search again.';
             } else if (/\b(pay|paid|salary|salaries|compensation|compens|wage|wages|earn|earning|hourly|stipend)\b/i.test(query)) {
                 emptyMsg = 'Looks like a pay question — try searching "highest paying jobs" or "top salary" to rank jobs by compensation.';
-            } else if (/\b(best|good for me|suit me|match|recommend|should i|qualify|top fits?|fit for)\b/i.test(query)) {
+            } else if (/\b(best|good for me|suit me|match|recommend|should i|qualify|top fits?|fit for|fits? for me|good fit)\b/i.test(query)) {
                 emptyMsg = 'Looks like a fit question — try the "🎯 Top 10 Fits for Me" button below, which uses your resume to find your best matches.';
             } else {
                 emptyMsg = `No matching jobs found for "${query}" — try different keywords or a broader phrase.`;
@@ -597,7 +606,8 @@ async function _handleSearch(searchType) {
         const subtitle = (searchType === 'top_fits' && jobs.length > 0 && jobs.length < 10)
             ? `Only ${jobs.length} jobs scored — open more jobs to score them`
             : null;
-        _showSearchOverlay(jobs, label, emptyMsg);
+        const isRanked = searchType === 'top_fits' || searchType === 'top_compensation';
+        _showSearchOverlay(jobs, label, emptyMsg, null, isRanked);
         _renderFilterCard(jobs.length, jobs.length, label, emptyMsg, subtitle);
     } catch (err) {
         _renderError(err);
@@ -1331,7 +1341,7 @@ function _tallyStat(stats, score) {
 //   • job is on another page → dispatch __wwai_open_job to the MAIN world,
 //     which calls WW's viewPosting() to load the modal without page navigation
 
-function _showSearchOverlay(jobs, query, emptyMsg, titleOverride = null) {
+function _showSearchOverlay(jobs, query, emptyMsg, titleOverride = null, ranked = false) {
     _hideSearchOverlay();
     _filterMeta = { shown: jobs.length, total: jobs.length, query, emptyMsg: emptyMsg ?? null };
 
@@ -1371,9 +1381,12 @@ function _showSearchOverlay(jobs, query, emptyMsg, titleOverride = null) {
 
         const thead = document.createElement('thead');
         const htr = document.createElement('tr');
-        ['Job Title', 'Employer', 'City', 'Term', 'Deadline', 'Pay', 'Fit'].forEach(label => {
+        const headers = ranked ? ['#', 'Job Title', 'Employer', 'City', 'Term', 'Deadline', 'Pay', 'Fit']
+                                : ['Job Title', 'Employer', 'City', 'Term', 'Deadline', 'Pay', 'Fit'];
+        headers.forEach(label => {
             const th = document.createElement('th');
             th.textContent = label;
+            if (label === '#') th.style.cssText = 'width:36px;text-align:center;';
             htr.appendChild(th);
         });
         thead.appendChild(htr);
@@ -1389,7 +1402,7 @@ function _showSearchOverlay(jobs, query, emptyMsg, titleOverride = null) {
             _openJobFromOverlay(row.dataset.jobId);
         });
 
-        for (const job of jobs) {
+        for (const [rankIdx, job] of jobs.entries()) {
             const jobId = String(job.jobId ?? job.id ?? '');
             // Search results only carry AI-scoring fields — fill gaps from the full jobs snapshot
             const stored = _allJobsMap[jobId] ?? {};
@@ -1437,6 +1450,12 @@ function _showSearchOverlay(jobs, query, emptyMsg, titleOverride = null) {
                 tdFit.appendChild(badge);
             }
 
+            if (ranked) {
+                const tdRank = document.createElement('td');
+                tdRank.style.cssText = 'text-align:center;font-weight:700;color:#9ca3af;font-size:12px;width:36px;';
+                tdRank.textContent = `#${rankIdx + 1}`;
+                tr.appendChild(tdRank);
+            }
             tr.appendChild(tdTitle); tr.appendChild(tdEmp);  tr.appendChild(tdCity);
             tr.appendChild(tdTerm);  tr.appendChild(tdDead); tr.appendChild(tdPay); tr.appendChild(tdFit);
             tbody.appendChild(tr);
