@@ -568,7 +568,7 @@ async function _handleSearch(searchType) {
         const label    = SEARCH_LABELS[searchType] ?? searchType;
         const emptyMsg = SEARCH_EMPTY_MESSAGES[searchType] ?? null;
         const subtitle = (searchType === 'top_fits' && jobs.length > 0 && jobs.length < 10)
-            ? `Only ${jobs.length} jobs scored — run Score All Jobs to rank more`
+            ? `Only ${jobs.length} jobs scored — open more jobs to score them`
             : null;
         _showSearchOverlay(jobs, label, emptyMsg);
         _renderFilterCard(jobs.length, jobs.length, label, emptyMsg, subtitle);
