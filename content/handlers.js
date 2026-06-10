@@ -550,7 +550,7 @@ async function _handleFreeSearch(query) {
             if (fitTerm) fitPayload.term = fitTerm;
             const result = await WWAnalyzer.searchJobs(fitPayload);
             const jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
-            const emptyMsg = SEARCH_EMPTY_MESSAGES.top_fits;
+            const emptyMsg = result.message || SEARCH_EMPTY_MESSAGES.top_fits;
             const subtitle = jobs.length > 0 && jobs.length < fitLimit
                 ? `Only ${jobs.length} jobs scored — open more jobs to score them`
                 : null;
@@ -574,7 +574,7 @@ async function _handleFreeSearch(query) {
             const subtitle = hitLimit
                 ? `There are more matches — try a more specific search (e.g. add a city, role, or term) to narrow results.`
                 : null;
-            const emptyMsg = SEARCH_EMPTY_MESSAGES.top_compensation;
+            const emptyMsg = result.message || SEARCH_EMPTY_MESSAGES.top_compensation;
             _showSearchOverlay(jobs, query, emptyMsg, null, true);
             _renderFilterCard(jobs.length, jobs.length, query, emptyMsg, subtitle);
         } catch (err) { _renderError(err); }
@@ -613,8 +613,9 @@ async function _handleFreeSearch(query) {
                 const subtitle = hitLimit
                     ? `There are more matches — try a more specific search to narrow results.`
                     : null;
-                _showSearchOverlay(jobs, query, null, null, true);
-                _renderFilterCard(jobs.length, jobs.length, query, null, subtitle);
+                const emptyMsg = result.message || null;
+                _showSearchOverlay(jobs, query, emptyMsg, null, true);
+                _renderFilterCard(jobs.length, jobs.length, query, emptyMsg, subtitle);
             } catch (err) { _renderError(err); }
             finally { _clearLoading(); }
             return;
@@ -671,7 +672,7 @@ async function _handleSearch(searchType) {
         const reason = result.reason ?? null;
         const emptyMsg = (searchType === 'hidden_gems' && reason === 'no_apps_data')
             ? 'Hidden Gems needs applicant count data — browse the main jobs board first, then try again.'
-            : SEARCH_EMPTY_MESSAGES[searchType] ?? null;
+            : result.message || SEARCH_EMPTY_MESSAGES[searchType] || null;
         const subtitle = (searchType === 'top_fits' && jobs.length > 0 && jobs.length < 10)
             ? `Only ${jobs.length} jobs scored — open more jobs to score them`
             : null;
@@ -707,10 +708,11 @@ async function _handleNewPostings() {
     _setLoading(`Finding jobs posted in the last ${days} day${days !== 1 ? 's' : ''}…`);
     _clearResult();
     try {
-        const result = await WWAnalyzer.searchJobs({ criteria: 'new_postings', days });
-        const jobs   = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
-        _showSearchOverlay(jobs, label, emptyMsg);
-        _renderFilterCard(jobs.length, jobs.length, label, emptyMsg);
+        const result   = await WWAnalyzer.searchJobs({ criteria: 'new_postings', days });
+        const jobs     = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
+        const finalMsg = result.message || emptyMsg;
+        _showSearchOverlay(jobs, label, finalMsg);
+        _renderFilterCard(jobs.length, jobs.length, label, finalMsg);
     } catch (err) {
         _renderError(err);
     } finally {
