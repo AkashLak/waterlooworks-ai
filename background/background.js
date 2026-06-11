@@ -105,7 +105,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // ── Handlers ───────────────────────────────────────────────────────────────────
 
 async function _handleSubmitJob(jobData) {
-    if (jobData?.jobId) await WWStorage.recordAnalyzedJob(jobData.jobId);
     return WWApi.submitJob(jobData);
 }
 
@@ -116,7 +115,9 @@ async function _handleSubmitJob(jobData) {
 async function _handleGetFitScore(jobId) {
     const resume = await _requireResume();
     _log('getFitScore | job:', jobId);
-    return WWApi.getFitScore(jobId, resume);
+    const result = await WWApi.getFitScore(jobId, resume);
+    await WWStorage.recordAnalyzedJob(jobId);
+    return result;
 }
 
 async function _handleGetDreamFit(jobId, dreamCriteria) {
