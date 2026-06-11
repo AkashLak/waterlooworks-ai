@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "WaterlooWorks AI Assistant",
+  "name": "WatAssistant",
   "version": "2.0.0",
   "description": "AI-powered job analysis for WaterlooWorks co-op students.",
 
@@ -53,7 +53,7 @@
 
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "WaterlooWorks AI Assistant",
+    "default_title": "WatAssistant",
     "default_icon": {
       "16": "assets/icons/icon16.png",
       "48": "assets/icons/icon48.png",

@@ -45,7 +45,7 @@ function _buildPanel() {
     // Static developer-authored HTML — dynamic content always set via textContent
     panel.innerHTML = `
         <div class="wwai-header">
-            <span class="wwai-header__title">WaterlooWorks AI</span>
+            <span class="wwai-header__title">WatAssistant</span>
             <button class="wwai-header__close" aria-label="Close">✕</button>
         </div>
         <div class="wwai-body">
@@ -115,7 +115,7 @@ function _buildPanel() {
                 <button class="wwai-btn wwai-btn--primary" id="wwai-report-submit">Submit</button>
             </div>
         </div>
-        <div class="wwai-footer">WaterlooWorks AI — free to use &nbsp;·&nbsp; <button id="wwai-report-btn" class="wwai-footer__report">⚑ Report issue</button></div>`;
+        <div class="wwai-footer">WatAssistant — free to use &nbsp;·&nbsp; <button id="wwai-report-btn" class="wwai-footer__report">⚑ Report issue</button></div>`;
     return panel;
 }
 
@@ -335,7 +335,7 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
     const toggle = document.createElement('button');
     toggle.id = 'wwai-toggle';
     toggle.textContent = 'AI';
-    toggle.setAttribute('aria-label', 'Toggle WaterlooWorks AI panel');
+    toggle.setAttribute('aria-label', 'Toggle WatAssistant panel');
     toggle.addEventListener('click', _togglePanel);
 
     document.body.appendChild(_panel);
