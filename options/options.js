@@ -151,11 +151,11 @@ function _setResumeCheck(done) {
 // ── Dream job criteria ─────────────────────────────────────────────────────────
 
 const DEFAULT_CRITERIA = [
+    'Salary',
     'Company Prestige',
     'Technical Stack',
     'Learning Opportunities',
     'Ownership & Impact',
-    'Salary',
 ];
 
 let _currentCriteria = [...DEFAULT_CRITERIA];
