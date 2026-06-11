@@ -581,7 +581,7 @@ async function _handleFreeSearch(query) {
         _setLoading(`Searching "${query}"…`); _clearResult();
         try {
             const payload = isAsc
-                ? { criteria: 'top_n', sort_by: 'compensation_hourly_cad', sort_dir: 'asc', limit }
+                ? { criteria: 'top_compensation', sort_dir: 'asc', limit }
                 : { criteria: 'top_compensation', limit };
             const result = await WWAnalyzer.searchJobs(payload);
             let jobs = result.jobs ?? result.results ?? (Array.isArray(result) ? result : []);
