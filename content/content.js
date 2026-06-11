@@ -93,7 +93,11 @@ function _buildPanel() {
                     <button class="wwai-btn wwai-btn--full" id="wwai-search-btn">🔍 Search</button>
                 </div>
                 <div class="wwai-status-line" id="wwai-status-line"></div>
-                <div class="wwai-legend-hint">Badges: 🟢 ≥ 70 &nbsp;🟡 ≥ 40 &nbsp;🔴 &lt; 40</div>
+                <div class="wwai-legend">
+                    <span class="wwai-legend__chip wwai-legend__chip--great">🟢 ≥ 70 · Great fit</span>
+                    <span class="wwai-legend__chip wwai-legend__chip--decent">🟡 40–69 · Decent</span>
+                    <span class="wwai-legend__chip wwai-legend__chip--poor">🔴 &lt; 40 · Weak fit</span>
+                </div>
             </div>
         </div>
         <div class="wwai-report-form wwai-hidden" id="wwai-report-form">

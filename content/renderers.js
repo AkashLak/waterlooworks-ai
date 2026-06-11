@@ -228,10 +228,9 @@ function _injectBadge(row, score) {
     const badge = document.createElement('span');
     badge.className = 'wwai-badge';
     badge.style.cssText = 'margin-left:5px; font-size:12px; cursor:default;';
-    const verdict = score >= 70 ? 'Great fit' : score >= 40 ? 'Decent' : 'Weak fit';
     badge.textContent = score == null
         ? '❓'
-        : (score >= 70 ? '🟢' : score >= 40 ? '🟡' : '🔴') + ` ${verdict}`;
+        : (score >= 70 ? '🟢' : score >= 40 ? '🟡' : '🔴') + ` ${score}`;
     badge.title = score == null
         ? 'Not yet analyzed'
         : `Fit score: ${score}/100`;
