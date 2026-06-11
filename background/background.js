@@ -16,7 +16,7 @@ function _log(...args) {
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 
 // Bump this string whenever the job-tracking logic changes to force a one-time reset.
-const TRACKING_VERSION = '2';
+const TRACKING_VERSION = '3';
 
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     _log('Extension lifecycle event, reason:', reason);
