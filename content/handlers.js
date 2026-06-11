@@ -404,6 +404,22 @@ async function _onTableChange() {
         }
 
         _injectPrecomputedBadges(rows, jobsMap);
+
+        // Persist any scores that came back from Supabase into ww_fit_scores so the
+        // popup count is accurate and restores correctly when switching back to the same resume.
+        const toWrite = {};
+        for (const job of jobs) {
+            const id = String(job.jobId ?? job.id ?? '');
+            const score = job.fitScore ?? job.fit_score ?? null;
+            if (id && score != null && _persistedFitScores[id] == null) {
+                toWrite[id] = score;
+                _persistedFitScores[id] = score;
+            }
+        }
+        if (Object.keys(toWrite).length) {
+            WWStorage.bulkSetFitScores(toWrite).catch(() => {});
+        }
+
         _refreshStatus();
 
         // Re-apply active filter to newly rendered rows (e.g. after WW page navigation).

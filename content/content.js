@@ -381,7 +381,6 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
                 .filter(k => k.startsWith('wwai_') && (k.endsWith('_BEST_FIT') || k.endsWith('_DREAM_JOB') || k.endsWith('_BATCH_FIT')))
                 .forEach(k => sessionStorage.removeItem(k));
             WWStorage.clearFitScores();
-            WWStorage.resetJobsAnalyzed();
             _persistedFitScores = {};
             document.querySelectorAll('.wwai-badge').forEach(b => b.remove());
             _clearResult();

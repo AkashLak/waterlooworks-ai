@@ -115,9 +115,7 @@ async function _handleSubmitJob(jobData) {
 async function _handleGetFitScore(jobId) {
     const resume = await _requireResume();
     _log('getFitScore | job:', jobId);
-    const result = await WWApi.getFitScore(jobId, resume);
-    await WWStorage.recordAnalyzedJob(jobId);
-    return result;
+    return WWApi.getFitScore(jobId, resume);
 }
 
 async function _handleGetDreamFit(jobId, dreamCriteria) {

@@ -23,7 +23,8 @@ btnSettings.addEventListener('click', () => chrome.runtime.openOptionsPage());
     _setIcon(iconWw, onWW);
     if (!onWW) nudge.classList.remove('hidden');
 
-    jobsCount.textContent = storage.jobsAnalyzed ?? 0;
+    const fitScores = await WWStorage.getFitScores();
+    jobsCount.textContent = Object.keys(fitScores).length;
 })();
 
 function _getActiveTab() {
