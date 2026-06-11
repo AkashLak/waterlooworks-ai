@@ -155,6 +155,7 @@ const DEFAULT_CRITERIA = [
     'Technical Stack',
     'Learning Opportunities',
     'Ownership & Impact',
+    'Salary',
 ];
 
 let _currentCriteria = [...DEFAULT_CRITERIA];
