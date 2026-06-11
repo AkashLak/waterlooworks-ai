@@ -231,10 +231,10 @@ function _injectBadge(row, score) {
     const verdict = score >= 70 ? 'Great fit' : score >= 40 ? 'Decent' : 'Weak fit';
     badge.textContent = score == null
         ? '❓'
-        : (score >= 70 ? '🟢' : score >= 40 ? '🟡' : '🔴') + ` ${score} · ${verdict}`;
+        : (score >= 70 ? '🟢' : score >= 40 ? '🟡' : '🔴') + ` ${verdict}`;
     badge.title = score == null
         ? 'Not yet analyzed'
-        : `Fit: ${score}/100`;
+        : `Fit score: ${score}/100`;
     titleEl.insertAdjacentElement('afterend', badge);
 }
 
