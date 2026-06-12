@@ -114,29 +114,30 @@ async function _handleSubmitJob(jobData) {
 
 async function _handleGetFitScore(jobId) {
     const resume = await _requireResume();
+    const resumeHash = await _getResumeHash(resume);
     _log('getFitScore | job:', jobId);
-    return WWApi.getFitScore(jobId, resume);
+    return WWApi.getFitScore(jobId, resume, resumeHash);
 }
 
 async function _handleGetDreamFit(jobId, dreamCriteria) {
     const resume = await _requireResume();
+    const resumeHash = await _getResumeHash(resume);
     _log('getDreamFit | job:', jobId);
-    return WWApi.getDreamFit(jobId, resume, dreamCriteria);
+    return WWApi.getDreamFit(jobId, resume, dreamCriteria, resumeHash);
 }
 
 async function _handleSearchJobs(criteria) {
-    // top_fits and free_search rank against the user's resume — require it.
-    // closing_soon and similar_roles work without a resume.
     const needsResume = criteria?.criteria === 'top_fits' || criteria?.criteria === 'free_search';
     const resume = needsResume
         ? await _requireResume()
         : (await WWStorage.getResume() ?? null);
+    const resumeHash = resume ? await _getResumeHash(resume) : null;
     _log('searchJobs | type:', criteria?.criteria);
-    return WWApi.searchJobs(resume, criteria ?? {});
+    return WWApi.searchJobs(resume, criteria ?? {}, resumeHash);
 }
 
 async function _handleAskQuestion(jobId, question) {
-    const resume = await WWStorage.getResume(); // optional — send if available, don't block if not
+    const resume = await WWStorage.getResume();
     _log('askQuestion | job:', jobId);
     return WWApi.askQuestion(jobId, question, resume);
 }
@@ -144,8 +145,8 @@ async function _handleAskQuestion(jobId, question) {
 async function _handleGetAllJobs(filters) {
     const resume = await WWStorage.getResume();
     if (resume) {
-        const hash = await _sha256(resume);
-        return WWApi.getAllJobs({ ...filters, resumeHash: hash });
+        const resumeHash = await _getResumeHash(resume);
+        return WWApi.getAllJobs({ ...filters, resumeHash });
     }
     return WWApi.getAllJobs(filters);
 }
@@ -155,10 +156,15 @@ async function _sha256(text) {
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+async function _getResumeHash(resume) {
+    const deviceId = await WWStorage.getOrCreateDeviceId();
+    return _sha256(deviceId + resume);
+}
+
 async function _handleSyncFitScores() {
     const [scores, resume] = await Promise.all([WWStorage.getFitScores(), WWStorage.getResume()]);
     if (!resume) return { synced: 0 }; // can't identify student without resume
-    const resumeHash = await _sha256(resume);
+    const resumeHash = await _getResumeHash(resume);
     const payload = Object.entries(scores ?? {})
         .filter(([, score]) => score != null)
         .map(([jobId, fitScore]) => ({ jobId, fitScore }));
