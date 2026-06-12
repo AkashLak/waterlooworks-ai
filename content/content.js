@@ -238,12 +238,20 @@ new MutationObserver((mutations) => {
             _onJobOpen(detail);
         }
     } else if (_currentJobId) {
+        const closedJobId = _currentJobId;
         _currentJobId    = null;
         _currentDetail   = null;
         _currentAnalyses = null;
         _submitting      = false;
         _clearPolling();
         _onJobClose();
+        // Immediately restore badge for the closed job if the score is already persisted —
+        // avoids waiting the full 1.5 s _onTableChange debounce.
+        const closedScore = _persistedFitScores[closedJobId];
+        if (closedScore != null) {
+            const tableRow = WWScaper.scrapeRowByJobId(closedJobId);
+            if (tableRow) _injectBadge(tableRow, closedScore);
+        }
         _scheduleTableSync();
     } else {
         // Detect when the XHR-rendered job table inserts rows into the DOM

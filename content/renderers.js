@@ -234,6 +234,7 @@ function _injectBadge(row, score) {
 
     const badge = document.createElement('span');
     badge.className = 'wwai-badge';
+    badge.dataset.jobId = String(row.jobId ?? '');
     badge.style.cssText = 'margin-left:5px; font-size:12px; cursor:default;';
     badge.textContent = score == null
         ? '❓'
@@ -246,10 +247,6 @@ function _injectBadge(row, score) {
 
 function _injectPrecomputedBadges(rows, jobsMap) {
     for (const row of rows) {
-        // Always remove any stale badge first — WW reuses <tr> nodes across page navigation,
-        // so a badge from page 1 would otherwise persist on a different job on page 2.
-        row.titleEl?.closest('tr.table__row--body')?.querySelector('.wwai-badge')?.remove();
-
         const job = jobsMap[row.jobId];
         const batchFit = _getCached(row.jobId, 'BATCH_FIT');
         const score = batchFit?.fitScore ?? batchFit?.fit_score

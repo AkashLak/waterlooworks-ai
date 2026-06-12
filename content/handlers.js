@@ -329,7 +329,7 @@ function _renderAnalysesReady() {
 
 async function _prefetchFitScore() {
     const jobId = _currentJobId; // capture before any await — modal may close while scoring runs
-    if (!jobId || _getCached(jobId, 'BEST_FIT')) return;
+    if (!jobId || _getCached(jobId, 'BEST_FIT') || _persistedFitScores[jobId] != null) return;
     try {
         const fit = await WWAnalyzer.getFitScore(jobId);
         _setCached(jobId, 'BEST_FIT', fit);
@@ -344,6 +344,15 @@ async function _onTableChange() {
     _tableSyncScheduled = false;
     const rows = WWScaper.scrapeAllListingRows();
     if (!rows.length) return;
+
+    // Synchronously strip badges that belong to a different job than what's now in each row.
+    // This fires 1.5 s after a page navigation — before any async work — so stale badges
+    // from page 1 disappear immediately rather than waiting for the full API round-trip.
+    for (const row of rows) {
+        const tr = row.titleEl?.closest('tr.table__row--body');
+        const badge = tr?.querySelector('.wwai-badge');
+        if (badge && badge.dataset.jobId !== String(row.jobId ?? '')) badge.remove();
+    }
 
     // Strip titleEl (DOM node) before sending — it's only needed for batch click()
     const rowData = rows.map(({ titleEl, ...rest }) => rest).filter(r => r.jobId);
