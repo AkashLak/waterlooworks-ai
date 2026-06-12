@@ -233,6 +233,7 @@
 /* ── Empty / error states ──────────────────────────────────────────────────── */
 
 .wwai-empty { text-align: center; color: #9ca3af; font-size: 13px; padding: 16px 0; line-height: 1.6; }
+.wwai-quota-msg { text-align: center; font-size: 12px; color: #92400e; background: linear-gradient(135deg, #fef3c7, #fde68a); border-radius: 8px; padding: 10px 12px; line-height: 1.5; }
 
 /* ── Ask input ─────────────────────────────────────────────────────────────── */
 

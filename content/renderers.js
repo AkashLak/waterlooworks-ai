@@ -212,6 +212,8 @@ function _renderError(err) {
         const btn = _el(card, 'button', 'wwai-btn wwai-btn--full', '→ Open Settings');
         btn.style.marginTop = '8px';
         btn.addEventListener('click', () => chrome.runtime.openOptionsPage());
+    } else if (err.type === 'quota_exceeded') {
+        _el(card, 'p', 'wwai-quota-msg', err.message ?? 'Daily analysis limit reached — resets at midnight UTC.');
     } else {
         _el(card, 'p', '', err.message ?? 'An unexpected error occurred. Please try again.');
     }
