@@ -211,14 +211,14 @@ function _renderError(err) {
         _el(card, 'p', '', 'Add your resume in Settings to start analyzing.');
         const btn = _el(card, 'button', 'wwai-btn wwai-btn--full', '→ Open Settings');
         btn.style.marginTop = '8px';
-        btn.addEventListener('click', () => chrome.runtime.openOptionsPage());
+        btn.addEventListener('click', () => chrome.runtime.sendMessage({ action: 'openOptions' }));
     } else if (err.type === 'quota_exceeded') {
         _el(card, 'p', 'wwai-quota-msg', err.message ?? 'Daily analysis limit reached — resets at midnight UTC.');
     } else if (err.type === 'invalid_api_key') {
         _el(card, 'p', 'wwai-quota-msg', err.message ?? 'Invalid API key — check your key in Settings.');
         const btn = _el(card, 'button', 'wwai-btn wwai-btn--full', '→ Open Settings');
         btn.style.marginTop = '8px';
-        btn.addEventListener('click', () => chrome.runtime.openOptionsPage());
+        btn.addEventListener('click', () => chrome.runtime.sendMessage({ action: 'openOptions' }));
     } else {
         _el(card, 'p', '', err.message ?? 'An unexpected error occurred. Please try again.');
     }
