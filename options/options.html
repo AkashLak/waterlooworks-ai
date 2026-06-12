@@ -69,6 +69,31 @@
                 <div class="status-msg hidden" id="status-msg" role="alert"></div>
             </section>
 
+            <!-- OpenAI API key (optional BYOK) -->
+            <section class="card">
+                <h2 class="card__title">Your OpenAI API Key <span class="card__optional">Optional</span></h2>
+                <p class="hint">
+                    Use your own key to bypass the daily analysis limit.<br>
+                    Stored locally on your device — never sent to our servers or logged.
+                </p>
+                <div class="key-row">
+                    <input
+                        type="password"
+                        id="api-key-input"
+                        class="input"
+                        placeholder="sk-…"
+                        autocomplete="off"
+                        spellcheck="false"
+                    >
+                    <button class="btn btn--ghost btn--icon" id="api-key-toggle" title="Show / hide key">👁</button>
+                </div>
+                <div class="actions">
+                    <button class="btn btn--primary" id="save-key-btn">Save Key</button>
+                    <button class="btn btn--ghost"   id="clear-key-btn">Clear</button>
+                </div>
+                <div class="status-msg hidden" id="key-status-msg" role="alert"></div>
+            </section>
+
             <!-- Dream job priorities -->
             <section class="card">
                 <h2 class="card__title">Dream Job Priorities</h2>

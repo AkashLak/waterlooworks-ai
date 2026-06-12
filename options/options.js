@@ -148,6 +148,42 @@ function _setResumeCheck(done) {
     iconResume.classList.toggle('done', done);
 }
 
+// ── OpenAI API key ─────────────────────────────────────────────────────────────
+
+const apiKeyInputEl  = document.getElementById('api-key-input');
+const apiKeyToggleEl = document.getElementById('api-key-toggle');
+const saveKeyBtn     = document.getElementById('save-key-btn');
+const clearKeyBtn    = document.getElementById('clear-key-btn');
+const keyStatusEl    = document.getElementById('key-status-msg');
+
+(async function initApiKey() {
+    const key = await WWStorage.getApiKey();
+    if (key) apiKeyInputEl.value = key;
+})();
+
+apiKeyToggleEl.addEventListener('click', () => {
+    apiKeyInputEl.type = apiKeyInputEl.type === 'password' ? 'text' : 'password';
+});
+
+saveKeyBtn.addEventListener('click', async () => {
+    const key = apiKeyInputEl.value.trim();
+    if (!key) { _showKeyStatus('Please enter an API key.', 'error'); return; }
+    if (!key.startsWith('sk-')) { _showKeyStatus('OpenAI keys start with sk-', 'error'); return; }
+    await WWStorage.saveApiKey(key);
+    _showKeyStatus('✓ API key saved.', 'success');
+});
+
+clearKeyBtn.addEventListener('click', async () => {
+    apiKeyInputEl.value = '';
+    await WWStorage.clearApiKey();
+    _showKeyStatus('API key cleared.', 'success');
+});
+
+function _showKeyStatus(message, type) {
+    keyStatusEl.textContent = message;
+    keyStatusEl.className = `status-msg ${type}`;
+}
+
 // ── Dream job criteria ─────────────────────────────────────────────────────────
 
 const DEFAULT_CRITERIA = [

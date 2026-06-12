@@ -113,33 +113,35 @@ async function _handleSubmitJob(jobData) {
 // content script message payload — limits the surface area where resume text is in memory.
 
 async function _handleGetFitScore(jobId) {
-    const resume = await _requireResume();
+    const [resume, apiKey] = await Promise.all([_requireResume(), WWStorage.getApiKey()]);
     const resumeHash = await _getResumeHash(resume);
     _log('getFitScore | job:', jobId);
-    return WWApi.getFitScore(jobId, resume, resumeHash);
+    return WWApi.getFitScore(jobId, resume, resumeHash, apiKey);
 }
 
 async function _handleGetDreamFit(jobId, dreamCriteria) {
-    const resume = await _requireResume();
+    const [resume, apiKey] = await Promise.all([_requireResume(), WWStorage.getApiKey()]);
     const resumeHash = await _getResumeHash(resume);
     _log('getDreamFit | job:', jobId);
-    return WWApi.getDreamFit(jobId, resume, dreamCriteria, resumeHash);
+    return WWApi.getDreamFit(jobId, resume, dreamCriteria, resumeHash, apiKey);
 }
 
 async function _handleSearchJobs(criteria) {
     const needsResume = criteria?.criteria === 'top_fits' || criteria?.criteria === 'free_search';
-    const resume = needsResume
-        ? await _requireResume()
-        : (await WWStorage.getResume() ?? null);
+    const [resumeRaw, apiKey] = await Promise.all([
+        needsResume ? _requireResume() : WWStorage.getResume(),
+        WWStorage.getApiKey(),
+    ]);
+    const resume = resumeRaw ?? null;
     const resumeHash = resume ? await _getResumeHash(resume) : null;
     _log('searchJobs | type:', criteria?.criteria);
-    return WWApi.searchJobs(resume, criteria ?? {}, resumeHash);
+    return WWApi.searchJobs(resume, criteria ?? {}, resumeHash, apiKey);
 }
 
 async function _handleAskQuestion(jobId, question) {
-    const resume = await WWStorage.getResume();
+    const [resume, apiKey] = await Promise.all([WWStorage.getResume(), WWStorage.getApiKey()]);
     _log('askQuestion | job:', jobId);
-    return WWApi.askQuestion(jobId, question, resume);
+    return WWApi.askQuestion(jobId, question, resume, apiKey);
 }
 
 async function _handleGetAllJobs(filters) {
