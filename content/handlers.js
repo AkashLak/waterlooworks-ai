@@ -345,14 +345,9 @@ async function _onTableChange() {
     const rows = WWScaper.scrapeAllListingRows();
     if (!rows.length) return;
 
-    // Synchronously strip badges that belong to a different job than what's now in each row.
-    // This fires 1.5 s after a page navigation — before any async work — so stale badges
-    // from page 1 disappear immediately rather than waiting for the full API round-trip.
-    for (const row of rows) {
-        const tr = row.titleEl?.closest('tr.table__row--body');
-        const badge = tr?.querySelector('.wwai-badge');
-        if (badge && badge.dataset.jobId !== String(row.jobId ?? '')) badge.remove();
-    }
+    // Re-run badge refresh in case the MutationObserver fired before _persistedFitScores
+    // was loaded (e.g. on initial page render) or missed an edge case.
+    _refreshBadgesFromCache(rows);
 
     // Strip titleEl (DOM node) before sending — it's only needed for batch click()
     const rowData = rows.map(({ titleEl, ...rest }) => rest).filter(r => r.jobId);

@@ -263,6 +263,7 @@ new MutationObserver((mutations) => {
             )
         );
         if (hasNewRows) {
+            _refreshBadgesFromCache(WWScaper.scrapeAllListingRows());
             _scheduleTableSync();
             // Trigger DOM Phase 1 when the All Jobs table first renders after SPA navigation.
             // Fire if state is idle and no token — even if a raw URL was captured, HTTP phase
@@ -287,10 +288,31 @@ new MutationObserver((mutations) => {
                     n.classList?.contains('wwai-badge')
                 )
             );
-            if (hasRowUpdate) _scheduleTableSync();
+            if (hasRowUpdate) {
+                _refreshBadgesFromCache(WWScaper.scrapeAllListingRows());
+                _scheduleTableSync();
+            }
         }
     }
 }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+
+// Synchronously strips badges that belong to a different job and re-injects from
+// local cache (session BATCH_FIT + _persistedFitScores). Called directly from the
+// MutationObserver so badges update at the moment WW swaps row content, not 1.5s
+// later when _onTableChange fires.
+function _refreshBadgesFromCache(rows) {
+    for (const row of rows) {
+        const tr = row.titleEl?.closest('tr.table__row--body');
+        if (!tr) continue;
+        const badge = tr.querySelector('.wwai-badge');
+        if (badge && badge.dataset.jobId !== String(row.jobId ?? '')) badge.remove();
+        if (!tr.querySelector('.wwai-badge')) {
+            const cached = _getCached(row.jobId, 'BATCH_FIT');
+            const score = cached?.fitScore ?? cached?.fit_score ?? _persistedFitScores[row.jobId] ?? null;
+            if (score != null) _injectBadge(row, score);
+        }
+    }
+}
 
 function _onJobOpen(detail) {
     document.getElementById('wwai-job-title').textContent = detail.title;
