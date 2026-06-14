@@ -133,8 +133,21 @@
     document.addEventListener('__wwai_open_job', (e) => {
         const postingId = e.detail?.postingId;
         if (!postingId) return;
-        if (typeof viewPosting === 'function')  { viewPosting(postingId);  return; }
-        if (typeof loadPosting === 'function')  { loadPosting(postingId);  return; }
+        if (typeof viewPosting === 'function') { viewPosting(postingId); return; }
+        if (typeof loadPosting === 'function') { loadPosting(postingId); return; }
+        // Fallback for boards without viewPosting (e.g. My Applications):
+        // scan visible rows for the one whose cell text matches the job ID, then click
+        // its title link from MAIN world — avoids the CSP violation on javascript: hrefs.
+        const id = String(postingId);
+        for (const tr of document.querySelectorAll('tr.table__row--body')) {
+            for (const cell of tr.querySelectorAll('td, th')) {
+                if (cell.textContent.replace(/\D/g, '').trim() === id) {
+                    const link = tr.querySelector('a');
+                    if (link) link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+                    return;
+                }
+            }
+        }
     });
 
     // ── Pagination click relay ────────────────────────────────────────────────

@@ -1668,24 +1668,16 @@ async function _openJobFromOverlay(jobId) {
     // Overlay stays open — WW modal z-index (100000102) is above the overlay (100000100),
     // so the modal appears on top and the user returns to their results when they close it.
 
-    // If the job row is on the current WW page, click its title link directly.
-    const row = WWScaper.scrapeRowByJobId(jobId);
-    if (row?.titleEl) {
-        row.titleEl.click();
-        return;
+    // Always route through MAIN world — clicking <a href="javascript:void(0);"> directly
+    // from an isolated-world script triggers a CSP violation before Vue's handler fires.
+    // interceptor.js handles __wwai_open_job: tries viewPosting(), then DOM fallback.
+
+    // If the job is on a different DOM-paginated page, navigate there first.
+    if (!WWScaper.scrapeRowByJobId(jobId)) {
+        const targetPage = _jobPageMap.get(String(jobId));
+        if (targetPage) await _navigateToDomPage(targetPage);
     }
 
-    // Job is on a different page (DOM-paginated board like My Applications or ESD).
-    // Navigate to the page we collected it from, then click the row.
-    const targetPage = _jobPageMap.get(String(jobId));
-    if (targetPage) {
-        await _navigateToDomPage(targetPage);
-        const r = WWScaper.scrapeRowByJobId(jobId);
-        if (r?.titleEl) { r.titleEl.click(); return; }
-    }
-
-    // Fallback: dispatch to MAIN world so interceptor.js can call WW's viewPosting().
-    // Works on Full Cycle jobs board; may be a no-op on My Applications.
     document.dispatchEvent(new CustomEvent('__wwai_open_job', { detail: { postingId: jobId } }));
 }
 
