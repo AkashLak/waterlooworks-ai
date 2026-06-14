@@ -140,8 +140,13 @@ async function _handleSearchJobs(criteria) {
 
 async function _handleAskQuestion(jobId, question) {
     const [resume, apiKey] = await Promise.all([WWStorage.getResume(), WWStorage.getApiKey()]);
+    // Compute hash even without a resume so the backend can gate quota.
+    // Device-only hash (no resume) still uniquely identifies the student for rate limiting.
+    const resumeHash = resume
+        ? await _getResumeHash(resume)
+        : await _sha256(await WWStorage.getOrCreateDeviceId());
     _log('askQuestion | job:', jobId);
-    return WWApi.askQuestion(jobId, question, resume, apiKey);
+    return WWApi.askQuestion(jobId, question, resume, apiKey, resumeHash);
 }
 
 async function _handleGetAllJobs(filters) {
