@@ -2,6 +2,9 @@
 config.js
 !config.example.js
 
+# Build output
+*.zip
+
 # Claude Code
 CLAUDE.md
 
