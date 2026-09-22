@@ -127,13 +127,19 @@ async function _handleGetDreamFit(jobId, dreamCriteria) {
 }
 
 async function _handleSearchJobs(criteria) {
-    const needsResume = criteria?.criteria === 'top_fits' || criteria?.criteria === 'free_search';
+    const searchType = criteria?.criteria;
+    const needsResume = ['best_fit', 'dream_jobs', 'top_fits', 'free_search'].includes(searchType);
+    const needsQuotaIdentity = ['best_fit', 'dream_jobs', 'free_search', 'similar_roles'].includes(searchType);
     const [resumeRaw, apiKey] = await Promise.all([
         needsResume ? _requireResume() : WWStorage.getResume(),
         WWStorage.getApiKey(),
     ]);
     const resume = resumeRaw ?? null;
-    const resumeHash = resume ? await _getResumeHash(resume) : null;
+    const resumeHash = resume
+        ? await _getResumeHash(resume)
+        : needsQuotaIdentity
+            ? await _sha256(await WWStorage.getOrCreateDeviceId())
+            : null;
     _log('searchJobs | type:', criteria?.criteria);
     return WWApi.searchJobs(resume, criteria ?? {}, resumeHash, apiKey);
 }
