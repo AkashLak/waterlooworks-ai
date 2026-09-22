@@ -50,6 +50,7 @@ function _buildPanel() {
         </div>
         <div class="wwai-body">
             <div class="wwai-resume-status" id="wwai-resume-status"></div>
+            <div class="wwai-auth-status" id="wwai-auth-status"></div>
             <div class="wwai-empty" id="wwai-empty">Click a job title to start analyzing.</div>
             <div class="wwai-job-info wwai-hidden" id="wwai-job-info">
                 <div class="wwai-job-info__title"   id="wwai-job-title"></div>
@@ -385,7 +386,25 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
         el.textContent = hasResume ? '✅ Resume uploaded' : '⚠️ No resume — upload in Settings';
         el.className = 'wwai-resume-status ' + (hasResume ? 'wwai-resume-status--ok' : 'wwai-resume-status--warn');
     }
+    function _updateAuthStatus(session) {
+        const el = document.getElementById('wwai-auth-status');
+        if (!el) return;
+        const signedIn = Boolean(session?.access_token);
+        el.textContent = signedIn ? '✅ Signed in — AI analysis is ready' : '🔐 Sign in to unlock AI analysis';
+        el.className = 'wwai-auth-status ' + (signedIn ? 'wwai-auth-status--ok' : 'wwai-auth-status--warn');
+        if (!signedIn) {
+            el.title = 'Open WatAssistant Settings to sign in';
+            el.addEventListener('click', () => chrome.runtime.sendMessage({ action: 'openOptions' }), { once: true });
+        }
+    }
     WWStorage.getResume().then(r => _updateResumeStatus(!!r));
+    WWAnalyzer.getAuthState().then(_updateAuthStatus).catch(() => _updateAuthStatus(null));
+
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && 'ww_auth_session' in changes) {
+            WWAnalyzer.getAuthState().then(_updateAuthStatus).catch(() => _updateAuthStatus(null));
+        }
+    });
 
     // Load persisted fit scores so badges survive tab close/reopen.
     // Also push them to Supabase so top_fits returns all jobs the user has ever scored.

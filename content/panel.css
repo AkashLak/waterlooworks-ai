@@ -108,6 +108,13 @@
 .wwai-resume-status--ok   { background: #d1fae5; color: #065f46; }
 .wwai-resume-status--warn { background: #fef3c7; color: #92400e; }
 
+.wwai-auth-status {
+    font-size: 11px; font-weight: 600; padding: 5px 8px;
+    border-radius: 6px; text-align: center;
+}
+.wwai-auth-status--ok { background: #dbeafe; color: #1e40af; }
+.wwai-auth-status--warn { background: #fee2e2; color: #991b1b; cursor: pointer; }
+
 /* ── Job info ──────────────────────────────────────────────────────────────── */
 
 .wwai-job-info {

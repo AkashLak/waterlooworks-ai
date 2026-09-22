@@ -50,7 +50,11 @@ signInBtn.addEventListener('click', async () => {
 signUpBtn.addEventListener('click', async () => {
     try {
         signUpBtn.disabled = true;
-        await WWAuth.signUp(authEmailEl.value.trim(), authPasswordEl.value);
+        const email = authEmailEl.value.trim().toLowerCase();
+        if (!email.endsWith('@uwaterloo.ca')) {
+            throw new Error('Use your @uwaterloo.ca email address. Other email domains cannot use WatAssistant.');
+        }
+        await WWAuth.signUp(email, authPasswordEl.value);
         _showAuthStatus('Check your Waterloo email to confirm your account, then sign in.', 'success');
     } catch (err) { _showAuthStatus(err.message, 'error'); }
     finally { signUpBtn.disabled = false; }
