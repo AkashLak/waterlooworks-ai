@@ -117,16 +117,16 @@ async function _handleSubmitJob(jobData) {
 
 async function _handleGetFitScore(jobId) {
     const [resume, apiKey] = await Promise.all([_requireResume(), WWStorage.getApiKey()]);
-    const resumeHash = await _getResumeHash(resume);
+    const [resumeHash, quotaHash] = await Promise.all([_getResumeHash(resume), _getQuotaHash()]);
     _log('getFitScore | job:', jobId);
-    return WWApi.getFitScore(jobId, resume, resumeHash, apiKey);
+    return WWApi.getFitScore(jobId, resume, resumeHash, quotaHash, apiKey);
 }
 
 async function _handleGetDreamFit(jobId, dreamCriteria) {
     const [resume, apiKey] = await Promise.all([_requireResume(), WWStorage.getApiKey()]);
-    const resumeHash = await _getResumeHash(resume);
+    const [resumeHash, quotaHash] = await Promise.all([_getResumeHash(resume), _getQuotaHash()]);
     _log('getDreamFit | job:', jobId);
-    return WWApi.getDreamFit(jobId, resume, dreamCriteria, resumeHash, apiKey);
+    return WWApi.getDreamFit(jobId, resume, dreamCriteria, resumeHash, quotaHash, apiKey);
 }
 
 async function _handleSearchJobs(criteria) {
@@ -138,24 +138,20 @@ async function _handleSearchJobs(criteria) {
         WWStorage.getApiKey(),
     ]);
     const resume = resumeRaw ?? null;
-    const resumeHash = resume
-        ? await _getResumeHash(resume)
-        : needsQuotaIdentity
-            ? await _sha256(await WWStorage.getOrCreateDeviceId())
-            : null;
+    const resumeHash = resume ? await _getResumeHash(resume) : null;
+    const quotaHash = needsQuotaIdentity ? await _getQuotaHash() : null;
     _log('searchJobs | type:', criteria?.criteria);
-    return WWApi.searchJobs(resume, criteria ?? {}, resumeHash, apiKey);
+    return WWApi.searchJobs(resume, criteria ?? {}, resumeHash, quotaHash, apiKey);
 }
 
 async function _handleAskQuestion(jobId, question) {
     const [resume, apiKey] = await Promise.all([WWStorage.getResume(), WWStorage.getApiKey()]);
-    // Compute hash even without a resume so the backend can gate quota.
-    // Device-only hash (no resume) still uniquely identifies the student for rate limiting.
-    const resumeHash = resume
-        ? await _getResumeHash(resume)
-        : await _sha256(await WWStorage.getOrCreateDeviceId());
+    const [resumeHash, quotaHash] = await Promise.all([
+        resume ? _getResumeHash(resume) : null,
+        _getQuotaHash(),
+    ]);
     _log('askQuestion | job:', jobId);
-    return WWApi.askQuestion(jobId, question, resume, apiKey, resumeHash);
+    return WWApi.askQuestion(jobId, question, resume, apiKey, resumeHash, quotaHash);
 }
 
 async function _handleGetAllJobs(filters) {
@@ -168,15 +164,12 @@ async function _handleGetAllJobs(filters) {
 }
 
 async function _handleGetQuotaStatus() {
-    const [resume, apiKey] = await Promise.all([WWStorage.getResume(), WWStorage.getApiKey()]);
+    const apiKey = await WWStorage.getApiKey();
     if (typeof apiKey === 'string' && apiKey.trim().startsWith('sk-')) {
         return { byok: true };
     }
 
-    const quotaIdentity = resume
-        ? await _getResumeHash(resume)
-        : await _sha256(await WWStorage.getOrCreateDeviceId());
-    return WWApi.getQuotaStatus(quotaIdentity);
+    return WWApi.getQuotaStatus(await _getQuotaHash());
 }
 
 async function _sha256(text) {
@@ -187,6 +180,10 @@ async function _sha256(text) {
 async function _getResumeHash(resume) {
     const deviceId = await WWStorage.getOrCreateDeviceId();
     return _sha256(deviceId + resume);
+}
+
+async function _getQuotaHash() {
+    return _sha256(await WWStorage.getOrCreateDeviceId());
 }
 
 async function _handleSyncFitScores() {
