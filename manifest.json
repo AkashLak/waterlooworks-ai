@@ -64,12 +64,5 @@
 
   "content_security_policy": {
     "extension_pages": "default-src 'self'; connect-src https://waterlooworks-ai-backend-production.up.railway.app; script-src 'self'; style-src 'self' 'unsafe-inline'"
-  },
-
-  "web_accessible_resources": [
-    {
-      "resources": ["lib/pdfjs/pdf.worker.min.js"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  }
 }
