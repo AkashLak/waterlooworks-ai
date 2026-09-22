@@ -90,6 +90,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'testConnection': // alias used by options page
             return respond(WWApi.getStatus());
 
+        case 'getQuotaStatus':
+            return respond(_handleGetQuotaStatus());
+
         case 'openOptions':
             chrome.runtime.openOptionsPage();
             return;
@@ -162,6 +165,18 @@ async function _handleGetAllJobs(filters) {
         return WWApi.getAllJobs({ ...filters, resumeHash });
     }
     return WWApi.getAllJobs(filters);
+}
+
+async function _handleGetQuotaStatus() {
+    const [resume, apiKey] = await Promise.all([WWStorage.getResume(), WWStorage.getApiKey()]);
+    if (typeof apiKey === 'string' && apiKey.trim().startsWith('sk-')) {
+        return { byok: true };
+    }
+
+    const quotaIdentity = resume
+        ? await _getResumeHash(resume)
+        : await _sha256(await WWStorage.getOrCreateDeviceId());
+    return WWApi.getQuotaStatus(quotaIdentity);
 }
 
 async function _sha256(text) {

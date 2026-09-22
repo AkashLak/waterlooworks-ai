@@ -119,7 +119,7 @@ function _buildPanel() {
                 <button class="wwai-btn wwai-btn--primary" id="wwai-report-submit">Submit</button>
             </div>
         </div>
-        <div class="wwai-footer">WatAssistant — free to use &nbsp;·&nbsp; <button id="wwai-report-btn" class="wwai-footer__report">⚑ Report issue</button></div>`;
+        <div class="wwai-footer"><span id="wwai-credit-status">AI credits: loading…</span> &nbsp;·&nbsp; <button id="wwai-report-btn" class="wwai-footer__report">⚑ Report issue</button></div>`;
     return panel;
 }
 
@@ -375,6 +375,7 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
     document.body.appendChild(_panel);
     document.body.appendChild(toggle);
     _wireEvents(_panel);
+    _refreshCreditStatus();
 
     if (sessionStorage.getItem('wwai_panel_open') === '1') _openPanel();
 
@@ -414,7 +415,9 @@ function _setCached(jobId, mode, d)  { try { sessionStorage.setItem(_cacheKey(jo
             _persistedFitScores = {};
             document.querySelectorAll('.wwai-badge').forEach(b => b.remove());
             _clearResult();
+            _refreshCreditStatus();
         }
+        if ('ww_openai_key' in changes) _refreshCreditStatus();
         if ('ww_dream_criteria' in changes) {
             // Bust dream job session cache when priorities change
             Object.keys(sessionStorage)

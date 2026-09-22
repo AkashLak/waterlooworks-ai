@@ -778,6 +778,26 @@ function _updateStatusLine(msg) {
     el.textContent = typeof msg === 'number' ? `${msg} jobs in database` : (msg ?? '');
 }
 
+async function _refreshCreditStatus() {
+    const el = document.getElementById('wwai-credit-status');
+    if (!el) return;
+
+    try {
+        const quota = await WWAnalyzer.getQuotaStatus();
+        if (quota.byok) {
+            el.textContent = 'BYOK active · unlimited AI';
+            return;
+        }
+        if (quota.remaining === 0) {
+            el.textContent = 'AI credits used · resets at midnight UTC';
+            return;
+        }
+        el.textContent = `AI credits: ${quota.remaining} / ${quota.limit} left today`;
+    } catch (_) {
+        el.textContent = '50 free AI credits/day';
+    }
+}
+
 async function _refreshStatus() {
     if (_descriptionUploadError) {
         _updateStatusLine(_descriptionUploadError);

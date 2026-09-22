@@ -310,6 +310,7 @@
     transition: color 0.12s;
 }
 .wwai-footer__report:hover { color: #9ca3af; }
+#wwai-credit-status { color: #9ca3af; }
 .wwai-hidden  { display: none !important; }
 .wwai-verdict { font-weight: 600; margin: 4px 0 8px; }
 
