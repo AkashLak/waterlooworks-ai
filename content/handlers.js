@@ -8,6 +8,7 @@ let _pollTimer  = null;
 let _pollCount  = 0;
 let _overlayEl  = null; // injected overlay for cross-page search results
 let _jobPageMap = new Map(); // jobId → 1-based page number (populated by _runDomPhase1)
+let _descriptionUploadError = null;
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -778,6 +779,10 @@ function _updateStatusLine(msg) {
 }
 
 async function _refreshStatus() {
+    if (_descriptionUploadError) {
+        _updateStatusLine(_descriptionUploadError);
+        return;
+    }
     try {
         const status = await WWAnalyzer.getStatus();
         const count  = status.totalJobs ?? status.jobCount ?? 0;
@@ -921,6 +926,7 @@ async function _handleBatch() {
 // Both phases use WaterlooWorks's own authenticated session — no extra login needed.
 
 const _SCRAPE_CONCURRENCY = 5; // parallel HTML fetches from WaterlooWorks
+const _BULK_DESCRIPTION_MAX_BYTES = 8 * 1024 * 1024;
 
 async function _directFetch(url, options, retries = 2) {
     // Always include credentials so WW's session cookies are sent with every request.
@@ -1260,6 +1266,7 @@ async function _runDirectScrapePhase2() {
 // then sends ONE bulk request to the backend per call — no per-job rate limit exposure.
 async function _fetchAndSubmitDescriptions(rows, statusLabel) {
     const total = rows.length;
+    _descriptionUploadError = null;
     _updateStatusLine(`${statusLabel}…`);
 
     // Step 1: fetch HTML for all jobs concurrently (5 at a time from WW)
@@ -1326,14 +1333,41 @@ async function _fetchAndSubmitDescriptions(rows, statusLabel) {
         return;
     }
 
-    // Step 2: single bulk request — backend queues AI analysis at a controlled rate internally
-    _updateStatusLine(`Submitting ${jobDatas.length} descriptions…`);
+    // Step 2: keep normal syncs in one request so the backend's analysis queue remains
+    // sequential, but split unusually large terms before they exceed the server body limit.
+    const batches = _splitBulkDescriptionBatches(jobDatas);
+    let stored = 0;
     try {
-        const result = await WWAnalyzer.bulkDescriptions(jobDatas);
-        _updateStatusLine(`${result?.stored ?? jobDatas.length} jobs ready`);
+        for (let index = 0; index < batches.length; index++) {
+            const batch = batches[index];
+            const suffix = batches.length > 1 ? ` (${index + 1}/${batches.length})` : '';
+            _updateStatusLine(`Submitting ${batch.length} descriptions${suffix}…`);
+            const result = await WWAnalyzer.bulkDescriptions(batch);
+            stored += result?.stored ?? batch.length;
+        }
+        _updateStatusLine(`${stored} job descriptions uploaded`);
     } catch (e) {
-        _updateStatusLine(`Bulk submit failed — ${e?.message}`);
+        _descriptionUploadError = `Description upload failed — ${e?.message ?? 'please try again'}`;
+        _updateStatusLine(_descriptionUploadError);
     }
+}
+
+function _splitBulkDescriptionBatches(jobs) {
+    const batches = [];
+    let batch = [];
+
+    for (const job of jobs) {
+        const candidate = [...batch, job];
+        const bytes = new TextEncoder().encode(JSON.stringify({ jobs: candidate })).length;
+        if (batch.length && bytes > _BULK_DESCRIPTION_MAX_BYTES) {
+            batches.push(batch);
+            batch = [job];
+        } else {
+            batch = candidate;
+        }
+    }
+    if (batch.length) batches.push(batch);
+    return batches;
 }
 
 async function _findHtmlDetailToken(sampleRow) {
