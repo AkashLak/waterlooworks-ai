@@ -39,10 +39,10 @@ Open any job posting on WaterlooWorks and the extension automatically submits it
 waterlooworks-ai/
 ├── manifest.json                  # MV3 manifest
 ├── config.example.js              # Config template — copy to config.js
-├── config.js                      # Gitignored — BACKEND_URL, API_SECRET, DEV_MODE
+├── config.js                      # Gitignored — endpoints and public Supabase client key
 │
 ├── background/
-│   └── background.js              # Service worker — only file that reads API_SECRET
+│   └── background.js              # Service worker — authenticated backend calls
 │
 ├── content/
 │   ├── interceptor.js             # MAIN world script (document_start): intercepts XHR/fetch for WW action tokens
@@ -92,7 +92,7 @@ waterlooworks-ai/
    ```bash
    cp config.example.js config.js
    ```
-   Then fill in `BACKEND_URL` and `API_SECRET` in `config.js`. Never commit this file — it is gitignored.
+   Then fill in `BACKEND_URL`, `SUPABASE_URL`, and the public Supabase anon/publishable key in `config.js`. Never put a service-role key in the extension.
 
 3. Load the extension unpacked:
    - Open `chrome://extensions`
@@ -120,7 +120,7 @@ The fastest way to test AI analysis without navigating WaterlooWorks:
 
 ## Architecture
 
-All backend calls are gated through the background service worker. Content scripts never touch `API_SECRET` or call the backend directly.
+All backend calls are gated through the background service worker. Content scripts never handle access tokens or call the backend directly.
 
 ```
 WaterlooWorks page
@@ -130,7 +130,7 @@ WaterlooWorks page
   └── content/handlers.js       All async action handlers (submit, poll, batch, search, ask, overlay)
   └── content/renderers.js      DOM helpers and result renderers
 
-background/background.js        Service worker — ONLY file that reads API_SECRET
+background/background.js        Service worker — authenticated backend calls
   └── lib/api.js                WWApi namespace: all REST calls to the backend
   └── lib/storage.js            WWStorage namespace: chrome.storage.local wrappers
 
@@ -234,7 +234,7 @@ Key selectors (verified April 2026):
 
 ## Security
 
-- `API_SECRET` is only ever read in `background/background.js`. It is never logged, passed through content script messages, or stored anywhere else.
+- Backend authentication uses short-lived Supabase access tokens; no backend secret is shipped in the extension.
 - Dynamic data in the panel is always set via `textContent`, never `innerHTML`, to prevent XSS from scraped job text.
 - The background service worker rejects any message whose `sender.id !== chrome.runtime.id`.
 - The extension CSP (`manifest.json`) restricts `connect-src` to the backend domain only.
@@ -247,7 +247,7 @@ Key selectors (verified April 2026):
 | Variable | Purpose |
 |---|---|
 | `BACKEND_URL` | Railway backend base URL (no trailing slash) |
-| `API_SECRET` | Shared secret for authenticating requests to the backend |
+| `SUPABASE_ANON_KEY` | Public Supabase client key used for sign-in |
 | `DEV_MODE` | `true` enables verbose background logging — set to `false` before distributing |
 
 ---

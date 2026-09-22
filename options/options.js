@@ -10,6 +10,55 @@ const clearBtn     = document.getElementById('clear-btn');
 const statusMsgEl  = document.getElementById('status-msg');
 const iconResume   = document.getElementById('icon-resume');
 
+const authEmailEl = document.getElementById('auth-email');
+const authPasswordEl = document.getElementById('auth-password');
+const signInBtn = document.getElementById('sign-in-btn');
+const signUpBtn = document.getElementById('sign-up-btn');
+const signOutBtn = document.getElementById('sign-out-btn');
+const authStatusEl = document.getElementById('auth-status-msg');
+
+function _showAuthStatus(message, type) {
+    authStatusEl.textContent = message;
+    authStatusEl.className = `status-msg ${type}`;
+}
+
+async function _refreshAuthUi() {
+    const session = await WWAuth.getSession();
+    const signedIn = Boolean(session?.access_token);
+    signInBtn.classList.toggle('hidden', signedIn);
+    signUpBtn.classList.toggle('hidden', signedIn);
+    signOutBtn.classList.toggle('hidden', !signedIn);
+    authEmailEl.disabled = signedIn;
+    authPasswordEl.disabled = signedIn;
+    if (signedIn) {
+        authEmailEl.value = session.user?.email ?? '';
+        authPasswordEl.value = '';
+        _showAuthStatus('✓ Signed in. Your daily credits are tied to this account.', 'success');
+    }
+}
+
+signInBtn.addEventListener('click', async () => {
+    try {
+        signInBtn.disabled = true;
+        await WWAuth.signIn(authEmailEl.value.trim(), authPasswordEl.value);
+        _showAuthStatus('✓ Signed in successfully.', 'success');
+        await _refreshAuthUi();
+    } catch (err) { _showAuthStatus(err.message, 'error'); }
+    finally { signInBtn.disabled = false; }
+});
+
+signUpBtn.addEventListener('click', async () => {
+    try {
+        signUpBtn.disabled = true;
+        await WWAuth.signUp(authEmailEl.value.trim(), authPasswordEl.value);
+        _showAuthStatus('Check your Waterloo email to confirm your account, then sign in.', 'success');
+    } catch (err) { _showAuthStatus(err.message, 'error'); }
+    finally { signUpBtn.disabled = false; }
+});
+
+signOutBtn.addEventListener('click', async () => { await WWAuth.signOut(); _showAuthStatus('Signed out.', 'success'); await _refreshAuthUi(); });
+_refreshAuthUi();
+
 // ── Init ───────────────────────────────────────────────────────────────────────
 
 (async function init() {

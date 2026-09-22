@@ -1,11 +1,11 @@
 // Service worker for WaterlooWorks AI Assistant.
-// SECURITY: This is the only file that reads API_SECRET or calls the backend.
+// SECURITY: Backend calls use the signed-in user's short-lived token.
 // All requests from content scripts are routed here via chrome.runtime.sendMessage.
 
-importScripts('../config.js', '../lib/storage.js', '../lib/api.js');
+importScripts('../config.js', '../lib/storage.js', '../lib/auth.js', '../lib/api.js');
 
 // ── Dev-mode logger ────────────────────────────────────────────────────────────
-// SECURITY: Never log API_SECRET or resume text.
+// SECURITY: Never log access tokens or resume text.
 
 function _log(...args) {
     if (typeof DEV_MODE !== 'undefined' && DEV_MODE) {
@@ -93,6 +93,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'getQuotaStatus':
             return respond(_handleGetQuotaStatus());
 
+        case 'getAuthState':
+            return respond(WWAuth.getSession());
+        case 'signIn':
+            return respond(WWAuth.signIn(message.email, message.password));
+        case 'signUp':
+            return respond(WWAuth.signUp(message.email, message.password));
+        case 'signOut':
+            return respond(WWAuth.signOut());
+
         case 'openOptions':
             chrome.runtime.openOptionsPage();
             return;
@@ -117,41 +126,36 @@ async function _handleSubmitJob(jobData) {
 
 async function _handleGetFitScore(jobId) {
     const [resume, apiKey] = await Promise.all([_requireResume(), WWStorage.getApiKey()]);
-    const [resumeHash, quotaHash] = await Promise.all([_getResumeHash(resume), _getQuotaHash()]);
+    const resumeHash = await _getResumeHash(resume);
     _log('getFitScore | job:', jobId);
-    return WWApi.getFitScore(jobId, resume, resumeHash, quotaHash, apiKey);
+    return WWApi.getFitScore(jobId, resume, resumeHash, apiKey);
 }
 
 async function _handleGetDreamFit(jobId, dreamCriteria) {
     const [resume, apiKey] = await Promise.all([_requireResume(), WWStorage.getApiKey()]);
-    const [resumeHash, quotaHash] = await Promise.all([_getResumeHash(resume), _getQuotaHash()]);
+    const resumeHash = await _getResumeHash(resume);
     _log('getDreamFit | job:', jobId);
-    return WWApi.getDreamFit(jobId, resume, dreamCriteria, resumeHash, quotaHash, apiKey);
+    return WWApi.getDreamFit(jobId, resume, dreamCriteria, resumeHash, apiKey);
 }
 
 async function _handleSearchJobs(criteria) {
     const searchType = criteria?.criteria;
     const needsResume = ['best_fit', 'dream_jobs', 'top_fits', 'free_search'].includes(searchType);
-    const needsQuotaIdentity = ['best_fit', 'dream_jobs', 'free_search', 'similar_roles'].includes(searchType);
     const [resumeRaw, apiKey] = await Promise.all([
         needsResume ? _requireResume() : WWStorage.getResume(),
         WWStorage.getApiKey(),
     ]);
     const resume = resumeRaw ?? null;
     const resumeHash = resume ? await _getResumeHash(resume) : null;
-    const quotaHash = needsQuotaIdentity ? await _getQuotaHash() : null;
     _log('searchJobs | type:', criteria?.criteria);
-    return WWApi.searchJobs(resume, criteria ?? {}, resumeHash, quotaHash, apiKey);
+    return WWApi.searchJobs(resume, criteria ?? {}, resumeHash, apiKey);
 }
 
 async function _handleAskQuestion(jobId, question) {
     const [resume, apiKey] = await Promise.all([WWStorage.getResume(), WWStorage.getApiKey()]);
-    const [resumeHash, quotaHash] = await Promise.all([
-        resume ? _getResumeHash(resume) : null,
-        _getQuotaHash(),
-    ]);
+    const resumeHash = resume ? await _getResumeHash(resume) : null;
     _log('askQuestion | job:', jobId);
-    return WWApi.askQuestion(jobId, question, resume, apiKey, resumeHash, quotaHash);
+    return WWApi.askQuestion(jobId, question, resume, apiKey, resumeHash);
 }
 
 async function _handleGetAllJobs(filters) {
@@ -169,7 +173,7 @@ async function _handleGetQuotaStatus() {
         return { byok: true };
     }
 
-    return WWApi.getQuotaStatus(await _getQuotaHash());
+    return WWApi.getQuotaStatus();
 }
 
 async function _sha256(text) {
@@ -182,9 +186,6 @@ async function _getResumeHash(resume) {
     return _sha256(deviceId + resume);
 }
 
-async function _getQuotaHash() {
-    return _sha256(await WWStorage.getOrCreateDeviceId());
-}
 
 async function _handleSyncFitScores() {
     const [scores, resume] = await Promise.all([WWStorage.getFitScores(), WWStorage.getResume()]);
