@@ -1,270 +1,174 @@
-# WaterlooWorks AI Assistant
+# WatAssistant
 
-A Chrome extension that injects an AI-powered analysis panel directly into [WaterlooWorks](https://waterlooworks.uwaterloo.ca), the University of Waterloo co-op job board. Upload your resume once — then get instant fit scores, role explanations, and smart job search on every posting you browse.
+WatAssistant is a Chrome extension for University of Waterloo co-op students using [WaterlooWorks](https://waterlooworks.uwaterloo.ca). It adds a private AI job-analysis panel directly to the job board, helping students understand postings, assess resume fit, and find opportunities across the current term.
 
----
+> Built for WaterlooWorks. A University of Waterloo email is required to use the hosted AI features.
 
-## What it does
+## Highlights
 
-Open any job posting on WaterlooWorks and the extension automatically submits it to a Railway-hosted backend, which runs GPT-powered analysis and stores the results in Supabase. From the injected side panel you can:
+- **Should I Apply?** — evaluates a posting against your resume, dream-job preferences, and role-quality signals.
+- **Resume-aware fit scoring** — see a 0–100 fit score, strengths, gaps, and a clear verdict for an individual job.
+- **Dream-job check** — identifies whether a role aligns with the priorities you set and whether it is a realistic stretch.
+- **Plain-English role explanations** — quickly understand what a role is likely to involve day to day.
+- **Ask about a posting** — ask focused questions such as whether remote work, a particular skill, or another requirement is mentioned.
+- **Role-disguise signals** — surfaces warnings and adjacent job titles when a posting appears to describe a different role than its title suggests.
+- **Fit badges that persist** — scored postings receive colour-coded fit badges in WaterlooWorks listings; scores remain available across browser sessions and are synced for ranked search.
+- **Smart job discovery** — find your top 10 fits, lower-competition “Hidden Gems,” and postings added within a chosen number of days.
+- **Natural-language search and ranking** — search jobs by constraints such as role, location, remote work, duration, skills, or education. Queries such as “top 10 highest-paying jobs,” “fewest applicants,” and “earliest deadlines” are recognized as ranked searches.
+- **Cross-page results** — review search results from the collected WaterlooWorks data in an overlay, then open a job in WaterlooWorks’ native modal.
+- **External-application link capture** — when a posting provides an application-by-website/email instruction, its application link is collected with the job details for backend use.
 
-- **Should I Apply?** — composite score combining fit, dream-job assessment, and a role sniff check
-- **Analyze Fit** — resume-specific fit score with strengths, gaps, and a verdict (0–100)
-- **Dream Job?** — attainability assessment based on your personal dream-role criteria
-- **Explain Role** — plain-English summary of what the job actually involves day-to-day
-- **Also Consider** — identifies related roles that overlap with this posting, so you can discover other job types worth applying to
-- **Ask** — free-form question about any posting ("is remote work mentioned?")
-- **Score All Jobs** — batch-scores every visible posting and injects colored badges into the table
-- **Smart Suggestions** — one-click searches for closing-soon jobs and your top 10 fits
+## How it works
 
----
+1. Create an account with a confirmed `@uwaterloo.ca` email and add your resume in Settings.
+2. Browse the WaterlooWorks jobs board as usual. WatAssistant syncs listing data and opens its panel when you select a posting.
+3. The extension sends a job’s details through its background service worker to the hosted API. Analyses are returned from cache when available or prepared asynchronously for new postings.
+4. Use the panel to assess the open job, or use Smart Suggestions and search to explore the wider job set.
 
-## Stack
+Your resume is read from Chrome’s local extension storage by the background service worker. It is never placed in the page’s JavaScript context or logged by the extension.
 
-| Layer | Technology |
-|---|---|
-| Extension | Chrome Manifest V3 — plain JavaScript, no build step |
-| Content scripts | `content.js`, `handlers.js`, `renderers.js`, `interceptor.js` (MAIN world) |
-| Background | Service worker (`background/background.js`) |
-| Backend | Railway (Node.js + Express + Supabase) |
-| AI | OpenAI `gpt-4o-mini` + `text-embedding-3-small` |
-| Resume storage | `chrome.storage.local` (plain text, never leaves the device except to the backend via the service worker) |
-| PDF parsing | PDF.js (bundled, `lib/pdfjs/`) |
+## Smart search examples
 
----
+Try searches such as:
 
-## Project Structure
+- `remote software jobs in Toronto`
+- `top 10 highest paying jobs`
+- `lowest salary jobs`
+- `fewest applicants`
+- `most openings`
+- `earliest deadlines`
+- `8 month data analyst roles`
+- `good fit for me`
 
-```
-waterlooworks-ai/
-├── manifest.json                  # MV3 manifest
-├── config.example.js              # Config template — copy to config.js
-├── config.js                      # Gitignored — endpoints and public Supabase client key
-│
-├── background/
-│   └── background.js              # Service worker — authenticated backend calls
-│
-├── content/
-│   ├── interceptor.js             # MAIN world script (document_start): intercepts XHR/fetch for WW action tokens
-│   ├── content.js                 # Panel HTML, shared state, MutationObserver, init
-│   ├── handlers.js                # All async action handlers (submit, poll, batch, search, ask, overlay)
-│   ├── renderers.js               # DOM helpers (_el, _label, _tagList) and result renderers
-│   └── panel.css                  # Panel styles
-│
-├── lib/
-│   ├── analyzer.js                # WWAnalyzer namespace: thin wrapper over chrome.runtime.sendMessage
-│   ├── api.js                     # WWApi namespace: all REST calls to the backend
-│   ├── scraper.js                 # WWScaper namespace: all WaterlooWorks DOM selectors
-│   ├── storage.js                 # WWStorage namespace: chrome.storage.local wrappers
-│   └── pdfjs/                     # Bundled PDF.js for resume parsing
-│       ├── pdf.min.js
-│       └── pdf.worker.min.js
-│
-├── options/
-│   ├── options.html               # Settings page (resume upload, dream-job criteria)
-│   ├── options.js
-│   └── options.css
-│
-├── popup/
-│   ├── popup.html                 # Extension toolbar popup
-│   ├── popup.js
-│   └── popup.css
-│
-├── assets/
-│   └── icons/                     # 16/48/128px extension icons
-│
-└── dev.html                       # Developer console — test analysis without navigating WaterlooWorks
-```
+Ranked compensation searches require job descriptions with compensation information to have been loaded. Similarly, richer filters such as work arrangement, duration, or skills become more complete as postings are opened and their details are collected.
 
----
+## Accounts, credits, and BYOK
 
-## Setup
+The free tier includes up to **50 uncached AI credits per day**, resetting at midnight UTC. Credit usage is associated with your signed-in University of Waterloo account.
 
-**Prerequisites:** Chrome or any Chromium browser. No Node.js or build tools required.
+You can optionally add your own OpenAI API key in Settings for unlimited AI use. The key is stored in Chrome’s local extension storage and forwarded only for requests to the hosted API; it is not stored by the backend.
 
-1. Clone the repo:
+## Install for development
+
+### Prerequisites
+
+- Chrome or another Chromium-based browser
+- A configured WatAssistant backend and Supabase project
+- No Node.js install or build step is required for the extension itself
+
+### Steps
+
+1. Clone the repository:
+
    ```bash
    git clone https://github.com/AkashLak/waterlooworks-ai.git
    cd waterlooworks-ai
    ```
 
-2. Create your config file:
+2. Create a local configuration file:
+
    ```bash
    cp config.example.js config.js
    ```
-   Then fill in `BACKEND_URL`, `SUPABASE_URL`, and the public Supabase anon/publishable key in `config.js`. Never put a service-role key in the extension.
 
-3. Load the extension unpacked:
-   - Open `chrome://extensions`
-   - Enable **Developer mode** (toggle, top right)
-   - Click **Load unpacked** → select this repo root
+3. In `config.js`, set:
 
-4. Go to the extension's **Options** page and paste in your resume (plain text or PDF upload).
+   - `BACKEND_URL` — hosted backend base URL, without a trailing slash
+   - `SUPABASE_URL` — your Supabase project URL
+   - `SUPABASE_ANON_KEY` — the public Supabase anon/publishable key
+   - `DEV_MODE` — enable only for local debugging; never log resumes or tokens
 
-5. Navigate to [WaterlooWorks](https://waterlooworks.uwaterloo.ca) — the panel appears automatically.
+   `config.js` is gitignored. Do not add a Supabase service-role key or another backend secret to the extension.
 
-> After editing source files, click the reload icon on `chrome://extensions` (or press **R** on that page). Content script changes also require reloading the WaterlooWorks tab.
+4. In Chrome, open `chrome://extensions`, enable **Developer mode**, select **Load unpacked**, and choose this repository’s root directory.
 
----
+5. Open **Settings** from the extension popup, create/sign in to a confirmed Waterloo email account, and add your resume as plain text or a PDF.
 
-## Developer Console (`dev.html`)
+6. Visit the WaterlooWorks jobs board. Select a job title to open the analysis panel.
 
-The fastest way to test AI analysis without navigating WaterlooWorks:
+After changing source files, reload the extension from `chrome://extensions`. Reload the WaterlooWorks tab as well after changing content scripts or styles.
 
-- Open `chrome-extension://[your-extension-id]/dev.html` in the browser
-- Paste a mock job description and click any analysis mode button
-- Messages go directly to `background.js`, bypassing all DOM scraping
-- Your extension ID appears on `chrome://extensions`
+## Project structure
 
----
+```text
+waterlooworks-ai/
+├── manifest.json                 # Chrome Manifest V3 configuration
+├── config.example.js             # Local configuration template
+├── background/
+│   └── background.js             # Service worker and authenticated API gateway
+├── content/
+│   ├── interceptor.js            # MAIN-world WaterlooWorks request interception
+│   ├── content.js                # Panel, lifecycle, listing synchronization
+│   ├── handlers.js               # Analysis, search, scraping, and overlay actions
+│   ├── renderers.js              # Safe DOM rendering and fit badges
+│   └── panel.css                 # Injected panel and overlay styling
+├── lib/
+│   ├── analyzer.js               # Content-script to service-worker message client
+│   ├── api.js                    # Hosted API client
+│   ├── auth.js                   # Supabase authentication client
+│   ├── scraper.js                # WaterlooWorks DOM parsing
+│   ├── storage.js                # Chrome local-storage helpers
+│   └── pdfjs/                    # Bundled PDF.js resume parser
+├── options/                      # Account, resume, API key, and priorities settings
+├── popup/                        # Extension-toolbar status popup
+├── assets/icons/                 # Extension icons
+└── dev.html                      # Standalone development test console
+```
 
 ## Architecture
 
-All backend calls are gated through the background service worker. Content scripts never handle access tokens or call the backend directly.
-
-```
+```text
 WaterlooWorks page
-  └── content/interceptor.js    MAIN world (document_start): intercepts XHR/fetch to capture
-  |                             WW action tokens; listens for __wwai_open_job → viewPosting()
-  └── content/content.js        Panel HTML, shared state, MutationObserver, init
-  └── content/handlers.js       All async action handlers (submit, poll, batch, search, ask, overlay)
-  └── content/renderers.js      DOM helpers and result renderers
-
-background/background.js        Service worker — authenticated backend calls
-  └── lib/api.js                WWApi namespace: all REST calls to the backend
-  └── lib/storage.js            WWStorage namespace: chrome.storage.local wrappers
-
-lib/analyzer.js                 WWAnalyzer namespace: thin wrapper sending chrome.runtime.sendMessage
-lib/scraper.js                  WWScaper namespace: all WaterlooWorks DOM selectors
+  ├── interceptor.js (MAIN world)
+  │     Captures WaterlooWorks listing/detail requests and opens native job modals
+  └── content scripts (isolated world)
+        Scrape displayed data, render the panel, and send extension messages
+                 │
+                 ▼
+background service worker
+  ├── Reads locally stored resume, optional BYOK key, and auth session
+  ├── Refreshes Supabase sessions when necessary
+  └── Makes authenticated requests to the hosted backend
+                 │
+                 ▼
+Hosted backend + Supabase
+  Stores collected job data, enforces account credits, and runs AI analysis/search
 ```
 
-### Message flow
+The extension uses `chrome.runtime.sendMessage` between content scripts and the service worker. Content scripts do not make direct backend calls and do not handle Supabase access tokens.
 
-1. User opens a job modal — `MutationObserver` in `content.js` detects it.
-2. `handlers.js` calls `WWAnalyzer.submitJob(jobData)` → background → `WWApi.submitJob()` → `POST /api/jobs/submit`.
-3. Backend stores the job in Supabase and queues GPT analysis. Returns `{ analysesReady, analyses }`.
-4. If not ready, `handlers.js` polls `GET /api/jobs/{jobId}/analyses` every 4 seconds (max 30 polls) until `analysesReady: true`.
-5. On ready, the panel shows the sniff warning (if flagged) and role preview in the header.
-6. User clicks an action button → `handlers.js` calls the appropriate `WWAnalyzer.*` method → background → `WWApi.*` → backend.
-7. Result returned via `sendResponse`, rendered into the panel by `renderers.js`.
+## Data and security
 
----
+- Authentication uses short-lived Supabase access tokens tied to confirmed `@uwaterloo.ca` accounts.
+- Dynamic job content is rendered with `textContent`, rather than injected as HTML.
+- The background service worker rejects messages not sent by this extension.
+- The extension CSP limits network connections to the configured backend and Supabase project.
+- Resumes, sessions, optional API keys, and persisted fit scores live in `chrome.storage.local`.
+- Resume hashes use a locally generated device identifier as a salt; raw resume text is not logged by the extension.
 
-## Analysis Modes
+WaterlooWorks’ DOM and internal requests can change. If scraping stops working, begin with [`lib/scraper.js`](lib/scraper.js) and the request-capture logic in [`content/interceptor.js`](content/interceptor.js).
 
-| Mode | Returns | How it's computed |
-|---|---|---|
-| `BEST_FIT` | `{ fitScore, strengths, gaps, verdict }` | `POST /api/fit-score` — resume-specific, live call |
-| `DREAM_JOB` | `{ isDream, isStretch, reason, attainabilityNote }` | `POST /api/dream-fit` — resume-specific, live call |
-| `SHOULD_APPLY` | Composite of fit + dream + QA sniff | Calls fit + reads pre-computed dream/qa |
-| `QA_SNIFF` | `{ isDisguised, actualRole, redFlags, alsoGoodFitFor, summary }` | Pre-computed on submit — surfaces related roles people applying to this posting typically also apply to |
-| `ROLE_EXPLAINER` | Plain-text role summary | Pre-computed on submit |
-| `ASK` | `{ answer }` | `POST /api/ask` — live call, resume optional |
+## Developer console
 
----
+`dev.html` provides a quick way to exercise analysis flows without navigating WaterlooWorks:
 
-## Score All Jobs (Batch Mode)
+1. Load the unpacked extension.
+2. Open `chrome-extension://<your-extension-id>/dev.html`.
+3. Paste a sample job description and run an analysis mode.
 
-Driven by `_handleBatch()` in `handlers.js`:
-
-1. Fetches all stored jobs from the backend (`GET /api/jobs/all`).
-2. Iterates visible table rows — skips jobs with no stored description.
-3. For each row: checks backend `fit_score` → session `BEST_FIT` cache → calls `POST /api/fit-score` as last resort.
-4. Writes result to both `BEST_FIT` and `BATCH_FIT` cache keys, injects a colored score badge into the table row.
-5. After the visible page finishes, silently pre-computes fit scores for all other DB jobs with descriptions so badges appear instantly on page navigation.
-
----
-
-## Smart Suggestions & Search
-
-Located in the panel footer. Hidden while a job modal is open; restored on close.
-
-| Button | Behavior |
-|---|---|
-| ⏰ Closing in 3 Days | `POST /api/jobs/search` with `criteria: closing_soon` — backend hardcodes the 3-day window |
-| 🎯 Top 10 Fits for Me | `POST /api/jobs/search` with `criteria: top_fits` — returns your top 10 scored jobs |
-| Free search bar | `POST /api/jobs/search` with `type: free_search` — natural-language query |
-
-All three display results in a full-viewport search overlay. Clicking a job title either clicks the live DOM row (if visible on the current page) or dispatches `__wwai_open_job` so `interceptor.js` can call WaterlooWorks's native `viewPosting()`.
-
----
-
-## Session Cache
-
-Results are cached in `sessionStorage` per job to avoid redundant API calls.
-
-| Key | Written by | Used by |
-|---|---|---|
-| `wwai_{jobId}_BEST_FIT` | Analyze Fit, Should I Apply? | Panel UI speed |
-| `wwai_{jobId}_BATCH_FIT` | Score All Jobs only | Table badge injection |
-| `wwai_{jobId}_DREAM_JOB` | Dream Job? | Panel UI speed |
-| `wwai_{jobId}_QA_SNIFF` | Submitted on job open | QA Sniff panel |
-
-When the user updates their resume in Settings, all `BEST_FIT`, `DREAM_JOB`, and `BATCH_FIT` keys are cleared.
-
----
-
-## Storage Keys
-
-All keys are prefixed `ww_`. The background service worker reads the resume directly from storage and never accepts it in message payloads.
-
-| Key | Type | Purpose |
-|---|---|---|
-| `ww_resume` | string | Plain-text resume |
-| `ww_jobs_analyzed` | number | Count of jobs analyzed this session |
-| `ww_analyzed_ids` | array | Job IDs analyzed (dedup) |
-| `ww_tracking_version` | number | Bumped to force a one-time reset of job tracking data |
-
----
-
-## DOM Scraping (`lib/scraper.js`)
-
-All selectors are annotated with their verification date. **`lib/scraper.js` is the first file to audit if the extension breaks** — WaterlooWorks periodically updates its frontend.
-
-Key selectors (verified April 2026):
-
-| Selector | Purpose |
-|---|---|
-| `tr.table__row--body` | Listing table rows |
-| `div.modal.is--visible[role="dialog"]` | Open job detail modal |
-| `div.tag__key-value-list` | Field label/value pairs in the Overview tab |
-| `.dashboard-header__posting-title .tag-label` | Job ID chip |
-
----
-
-## Security
-
-- Backend authentication uses short-lived Supabase access tokens; no backend secret is shipped in the extension.
-- Dynamic data in the panel is always set via `textContent`, never `innerHTML`, to prevent XSS from scraped job text.
-- The background service worker rejects any message whose `sender.id !== chrome.runtime.id`.
-- The extension CSP (`manifest.json`) restricts `connect-src` to the backend domain only.
-- `DEV_MODE` in `config.js` must be `false` before distributing — it enables verbose logging in the background service worker only.
-
----
-
-## Config Reference
-
-| Variable | Purpose |
-|---|---|
-| `BACKEND_URL` | Railway backend base URL (no trailing slash) |
-| `SUPABASE_ANON_KEY` | Public Supabase client key used for sign-in |
-| `DEV_MODE` | `true` enables verbose background logging — set to `false` before distributing |
-
----
+The console communicates with the same background service worker used by the extension.
 
 ## Deployment
 
-The backend is a separate Railway-hosted service (not included in this repo). The extension talks to it via `BACKEND_URL` set in `config.js`.
+This repository contains the Chrome extension. The API is deployed separately and configured through `BACKEND_URL`.
 
-| Component | Platform |
-|---|---|
-| Extension | Loaded unpacked (development) or Chrome Web Store |
-| Backend API | Railway |
-| Database | Supabase (managed via backend) |
-| AI | OpenAI GPT-4o-mini + text-embedding-3-small (managed via backend) |
-
----
+| Component | Service |
+| --- | --- |
+| Extension | Chrome, loaded unpacked during development or distributed through the Chrome Web Store |
+| Backend API | Railway or another Node.js host |
+| Authentication and data | Supabase |
+| AI | OpenAI, managed by the backend |
 
 ## License
 
-MIT
+[MIT](LICENSE)
