@@ -6,7 +6,7 @@ WatAssistant is a Chrome extension for University of Waterloo co-op students usi
 
 ## Demo
 
-[Watch the WatAssistant demo](assets/demo/watassistant-demo.mov)
+https://github.com/user-attachments/assets/8a6d50b7-3c7f-41a5-871b-a278d921f6d8
 
 ## Highlights
 
