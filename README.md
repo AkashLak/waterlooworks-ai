@@ -4,11 +4,7 @@
 
 <h1 align="center">WatAssistant</h1>
 
-<p align="center"><strong>Find the right WaterlooWorks job—without the endless clicking.</strong></p>
-
-<p align="center">An AI job assistant for University of Waterloo co-op students: understand postings, assess resume fit, and discover stronger opportunities.</p>
-
-<p align="center">Built for WaterlooWorks · A University of Waterloo email is required for hosted AI features.</p>
+<p align="center"><strong>An AI-powered Chrome extension that helps Waterloo students find the right co-op jobs faster.</strong></p>
 
 ## Demo
 
