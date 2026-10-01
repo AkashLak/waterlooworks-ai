@@ -1,8 +1,14 @@
-# WatAssistant
+<p align="center">
+  <img src="assets/icons/icon128.png" alt="WatAssistant logo" width="112">
+</p>
 
-WatAssistant is a Chrome extension for University of Waterloo co-op students using [WaterlooWorks](https://waterlooworks.uwaterloo.ca). It adds a private AI job-analysis panel directly to the job board, helping students understand postings, assess resume fit, and find opportunities across the current term.
+<h1 align="center">WatAssistant</h1>
 
-> Built for WaterlooWorks. A University of Waterloo email is required to use the hosted AI features.
+<p align="center"><strong>Find the right WaterlooWorks job—without the endless clicking.</strong></p>
+
+<p align="center">An AI job assistant for University of Waterloo co-op students: understand postings, assess resume fit, and discover stronger opportunities.</p>
+
+<p align="center">Built for WaterlooWorks · A University of Waterloo email is required for hosted AI features.</p>
 
 ## Demo
 
