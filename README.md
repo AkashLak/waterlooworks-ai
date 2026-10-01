@@ -4,6 +4,10 @@ WatAssistant is a Chrome extension for University of Waterloo co-op students usi
 
 > Built for WaterlooWorks. A University of Waterloo email is required to use the hosted AI features.
 
+## Demo
+
+[Watch the WatAssistant demo](assets/demo/watassistant-demo.mov)
+
 ## Highlights
 
 - **Should I Apply?** — evaluates a posting against your resume, dream-job preferences, and role-quality signals.
