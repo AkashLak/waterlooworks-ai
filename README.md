@@ -171,7 +171,7 @@ This repository contains the Chrome extension. The API is deployed separately an
 | Component | Service |
 | --- | --- |
 | Extension | Chrome, loaded unpacked during development or distributed through the Chrome Web Store |
-| Backend API | Railway or another Node.js host |
+| Backend API | Railway |
 | Authentication and data | Supabase |
 | AI | OpenAI, managed by the backend |
 
